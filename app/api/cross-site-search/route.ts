@@ -29,35 +29,24 @@ export async function GET(request: NextRequest) {
     const fetchPromises = sources
       .filter((source) => source !== excludeSource)
       .map((source) => {
-        // Add individual error handling for each source
-        try {
-          switch (source) {
-            case "Startech":
-              return fetchStartechProducts(simplifiedQuery)
-            case "Techland":
-              return fetchTechlandProducts(simplifiedQuery)
-            case "UltraTech":
-              return fetchUltratechProducts(simplifiedQuery)
-            case "Potaka IT":
-              return fetchPotakaitProducts(simplifiedQuery)
-            case "PC House":
-              return fetchPCHouseProducts(simplifiedQuery)
-            default:
-              return Promise.resolve([])
-          }
-        } catch (error) {
-          console.error(`Error setting up fetch for ${source}:`, error)
-          return Promise.resolve([])
+        switch (source) {
+          case "Startech":
+            return fetchStartechProducts(simplifiedQuery)
+          case "Techland":
+            return fetchTechlandProducts(simplifiedQuery)
+          case "UltraTech":
+            return fetchUltratechProducts(simplifiedQuery)
+          case "Potaka IT":
+            return fetchPotakaitProducts(simplifiedQuery)
+          case "PC House":
+            return fetchPCHouseProducts(simplifiedQuery)
+          default:
+            return Promise.resolve([])
         }
       })
 
-    // Wait for all fetches to complete with Promise.allSettled
-    const settledResults = await Promise.allSettled(fetchPromises)
-
-    // Extract results from fulfilled promises
-    const results = settledResults
-      .filter((result): result is PromiseFulfilledResult<any[]> => result.status === "fulfilled")
-      .map((result) => result.value)
+    // Wait for all fetches to complete
+    const results = await Promise.all(fetchPromises)
 
     // Flatten the results array
     const allProducts = results.flat()
@@ -68,15 +57,11 @@ export async function GET(request: NextRequest) {
     sources
       .filter((source) => source !== excludeSource)
       .forEach((source, index) => {
-        if (index < results.length) {
-          const sourceProducts = results[index]
-          if (sourceProducts && sourceProducts.length > 0) {
-            // Find the most relevant product by comparing names
-            const mostRelevant = findMostRelevantProduct(sourceProducts, query)
-            crossSiteProducts[source] = mostRelevant
-          } else {
-            crossSiteProducts[source] = null
-          }
+        const sourceProducts = results[index]
+        if (sourceProducts && sourceProducts.length > 0) {
+          // Find the most relevant product by comparing names
+          const mostRelevant = findMostRelevantProduct(sourceProducts, query)
+          crossSiteProducts[source] = mostRelevant
         } else {
           crossSiteProducts[source] = null
         }
@@ -85,13 +70,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ crossSiteProducts })
   } catch (error) {
     console.error("Error fetching cross-site products:", error)
-    return NextResponse.json(
-      {
-        error: "Failed to fetch cross-site products",
-        message: error instanceof Error ? error.message : "Unknown error",
-      },
-      { status: 500 },
-    )
+    return NextResponse.json({ error: "Failed to fetch cross-site products" }, { status: 500 })
   }
 }
 
