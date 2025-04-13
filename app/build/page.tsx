@@ -220,12 +220,22 @@ export default function BuildPage() {
     setCrossSiteLoading((prev) => ({ ...prev, [type]: true }))
 
     try {
+      // Add timeout to prevent hanging requests
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 30000) // 30 second timeout
+
       const response = await fetch(
         `/api/cross-site-search?query=${encodeURIComponent(component.name)}&excludeSource=${encodeURIComponent(component.source)}`,
-      )
+        { signal: controller.signal },
+      ).catch((error) => {
+        console.error(`Error fetching cross-site prices: ${error.message}`)
+        return null
+      })
 
-      if (!response.ok) {
-        throw new Error("Failed to fetch cross-site prices")
+      clearTimeout(timeoutId)
+
+      if (!response || !response.ok) {
+        throw new Error(`Failed to fetch cross-site prices: ${response?.status || "No response"}`)
       }
 
       const data = await response.json()
@@ -243,6 +253,7 @@ export default function BuildPage() {
       })
     } catch (error) {
       console.error("Error fetching cross-site prices:", error)
+      // Don't update state on error to keep previous data
     } finally {
       setCrossSiteLoading((prev) => ({ ...prev, [type]: false }))
     }
