@@ -169,9 +169,9 @@ export default function ComponentSelectionPage() {
         url += `&search=${encodeURIComponent(query)}`
       }
 
+      // Increase timeout to 60 seconds for complex searches
       const response = await fetch(url, {
-        // Add a longer timeout for component fetching
-        signal: AbortSignal.timeout(30000),
+        signal: AbortSignal.timeout(60000), // Increase timeout to 60 seconds
       }).catch((error) => {
         console.error("Error fetching components:", error)
         throw new Error("Network error while fetching components. Please try again.")
