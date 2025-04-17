@@ -11,6 +11,7 @@ import { Cpu, ShoppingCart } from "lucide-react"
 const navItems = [
   { name: "Home", href: "/" },
   { name: "Build", href: "/build" },
+  { name: "Guides", href: "/guides" },
 ]
 
 export function SiteHeader() {
