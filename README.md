@@ -27,8 +27,6 @@ Live: [pcpartpicker.sabbir.lol](https://pcpartpicker.sabbir.lol)
 ```bash
 git clone https://github.com/s8rr/PCPartPickerBD.git
 cd PCPartPickerBD
-pnpm install
-pnpm dev
 ```
 2. Iinstall dependencies:
 
