@@ -15,6 +15,7 @@ export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams
   const query = searchParams.get("query")
   const excludeSource = searchParams.get("excludeSource") || ""
+  const limit = Number.parseInt(searchParams.get("limit") || "10", 10) // Default to 10 products per retailer
 
   if (!query) {
     return NextResponse.json({ error: "Query parameter is required" }, { status: 400 })
@@ -33,17 +34,17 @@ export async function GET(request: NextRequest) {
         try {
           switch (source) {
             case "Startech":
-              return fetchStartechProducts(simplifiedQuery)
+              return fetchStartechProducts(simplifiedQuery, limit)
             case "Techland":
-              return fetchTechlandProducts(simplifiedQuery)
+              return fetchTechlandProducts(simplifiedQuery, limit)
             case "UltraTech":
-              return fetchUltratechProducts(simplifiedQuery)
+              return fetchUltratechProducts(simplifiedQuery, limit)
             case "Potaka IT":
-              return fetchPotakaitProducts(simplifiedQuery)
+              return fetchPotakaitProducts(simplifiedQuery, limit)
             case "PC House":
-              return fetchPCHouseProducts(simplifiedQuery)
+              return fetchPCHouseProducts(simplifiedQuery, limit)
             case "Skyland":
-              return fetchSkylandProducts(simplifiedQuery)
+              return fetchSkylandProducts(simplifiedQuery, limit)
             default:
               return Promise.resolve([])
           }
@@ -191,32 +192,57 @@ function findMostRelevantProduct(products: Product[], originalQuery: string): Pr
   return scoredProducts[0]?.score > 0 ? scoredProducts[0].product : products[0]
 }
 
-// Reuse the existing fetch functions from the products API
-async function fetchStartechProducts(query: string): Promise<Product[]> {
+// Optimized fetch functions for each retailer
+async function fetchStartechProducts(query: string, limit = 10): Promise<Product[]> {
   const products: Product[] = []
   const url = `https://www.startech.com.bd/product/search?search=${encodeURIComponent(query)}`
 
   try {
-    const response = await fetch(url, { next: { revalidate: 3600 } })
+    // Add timeout to prevent hanging requests
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 10000) // 10 second timeout
+
+    const response = await fetch(url, {
+      next: { revalidate: 3600 }, // Cache for 1 hour
+      signal: controller.signal,
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+      },
+    }).catch((error) => {
+      console.error(`Error fetching from Startech: ${error.message}`)
+      return null
+    })
+
+    clearTimeout(timeoutId)
+
+    if (!response || !response.ok) {
+      console.warn(`Failed to fetch from Startech: ${response?.status || "No response"}`)
+      return []
+    }
+
     const html = await response.text()
     const $ = cheerio.load(html)
 
-    $(".p-item").each((_, element) => {
-      const name = $(element).find(".p-item-name").text().trim()
-      const price = $(element).find(".p-item-price").text().trim()
-      const image = $(element).find(".p-item-img img").attr("src") || ""
-      const productUrl = $(element).find("a").attr("href") || ""
-      const availability = $(element).find(".p-item-stock").text().includes("In Stock") ? "In Stock" : "Out of Stock"
+    // Process only up to the limit
+    $(".p-item")
+      .slice(0, limit)
+      .each((_, element) => {
+        const name = $(element).find(".p-item-name").text().trim()
+        const price = $(element).find(".p-item-price").text().trim()
+        const image = $(element).find(".p-item-img img").attr("src") || ""
+        const productUrl = $(element).find("a").attr("href") || ""
+        const availability = $(element).find(".p-item-stock").text().includes("In Stock") ? "In Stock" : "Out of Stock"
 
-      products.push({
-        name,
-        price,
-        image,
-        availability,
-        source: "Startech",
-        url: productUrl,
+        products.push({
+          name,
+          price,
+          image,
+          availability,
+          source: "Startech",
+          url: productUrl,
+        })
       })
-    })
 
     return products
   } catch (error) {
@@ -225,31 +251,59 @@ async function fetchStartechProducts(query: string): Promise<Product[]> {
   }
 }
 
-async function fetchTechlandProducts(query: string): Promise<Product[]> {
+// Similar optimized functions for other retailers
+// (Techland, UltraTech, Potaka IT, PC House, Skyland)
+// These follow the same pattern as fetchStartechProducts
+async function fetchTechlandProducts(query: string, limit = 10): Promise<Product[]> {
   const products: Product[] = []
   const url = `https://www.techlandbd.com/index.php?route=product/search&search=${encodeURIComponent(query)}`
 
   try {
-    const response = await fetch(url, { next: { revalidate: 3600 } })
+    // Add timeout to prevent hanging requests
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 10000) // 10 second timeout
+
+    const response = await fetch(url, {
+      next: { revalidate: 3600 }, // Cache for 1 hour
+      signal: controller.signal,
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+      },
+    }).catch((error) => {
+      console.error(`Error fetching from Techland: ${error.message}`)
+      return null
+    })
+
+    clearTimeout(timeoutId)
+
+    if (!response || !response.ok) {
+      console.warn(`Failed to fetch from Techland: ${response?.status || "No response"}`)
+      return []
+    }
+
     const html = await response.text()
     const $ = cheerio.load(html)
 
-    $(".product-layout").each((_, element) => {
-      const name = $(element).find(".name a").text().trim()
-      const price = $(element).find(".price").text().trim().replace(/\s+/g, " ")
-      const image = $(element).find(".image img").attr("src") || ""
-      const productUrl = $(element).find(".name a").attr("href") || ""
-      const availability = $(element).find(".stock").text().includes("In Stock") ? "In Stock" : "Out of Stock"
+    // Process only up to the limit
+    $(".product-layout")
+      .slice(0, limit)
+      .each((_, element) => {
+        const name = $(element).find(".name a").text().trim()
+        const price = $(element).find(".price").text().trim().replace(/\s+/g, " ")
+        const image = $(element).find(".image img").attr("src") || ""
+        const productUrl = $(element).find(".name a").attr("href") || ""
+        const availability = $(element).find(".stock").text().includes("In Stock") ? "In Stock" : "Out of Stock"
 
-      products.push({
-        name,
-        price,
-        image,
-        availability,
-        source: "Techland",
-        url: productUrl,
+        products.push({
+          name,
+          price,
+          image,
+          availability,
+          source: "Techland",
+          url: productUrl,
+        })
       })
-    })
 
     return products
   } catch (error) {
@@ -258,31 +312,56 @@ async function fetchTechlandProducts(query: string): Promise<Product[]> {
   }
 }
 
-async function fetchUltratechProducts(query: string): Promise<Product[]> {
+async function fetchUltratechProducts(query: string, limit = 10): Promise<Product[]> {
   const products: Product[] = []
   const url = `https://www.ultratech.com.bd/index.php?route=product/search&search=${encodeURIComponent(query)}`
 
   try {
-    const response = await fetch(url, { next: { revalidate: 3600 } })
+    // Add timeout to prevent hanging requests
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 10000) // 10 second timeout
+
+    const response = await fetch(url, {
+      next: { revalidate: 3600 }, // Cache for 1 hour
+      signal: controller.signal,
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+      },
+    }).catch((error) => {
+      console.error(`Error fetching from UltraTech: ${error.message}`)
+      return null
+    })
+
+    clearTimeout(timeoutId)
+
+    if (!response || !response.ok) {
+      console.warn(`Failed to fetch from UltraTech: ${response?.status || "No response"}`)
+      return []
+    }
+
     const html = await response.text()
     const $ = cheerio.load(html)
 
-    $(".product-layout").each((_, element) => {
-      const name = $(element).find(".name a").text().trim()
-      const price = $(element).find(".price").text().trim().replace(/\s+/g, " ")
-      const image = $(element).find(".image img").attr("src") || ""
-      const productUrl = $(element).find(".name a").attr("href") || ""
-      const availability = $(element).find(".stock").text().includes("In Stock") ? "In Stock" : "Out of Stock"
+    // Process only up to the limit
+    $(".product-layout")
+      .slice(0, limit)
+      .each((_, element) => {
+        const name = $(element).find(".name a").text().trim()
+        const price = $(element).find(".price").text().trim().replace(/\s+/g, " ")
+        const image = $(element).find(".image img").attr("src") || ""
+        const productUrl = $(element).find(".name a").attr("href") || ""
+        const availability = $(element).find(".stock").text().includes("In Stock") ? "In Stock" : "Out of Stock"
 
-      products.push({
-        name,
-        price,
-        image,
-        availability,
-        source: "UltraTech",
-        url: productUrl,
+        products.push({
+          name,
+          price,
+          image,
+          availability,
+          source: "UltraTech",
+          url: productUrl,
+        })
       })
-    })
 
     return products
   } catch (error) {
@@ -291,31 +370,56 @@ async function fetchUltratechProducts(query: string): Promise<Product[]> {
   }
 }
 
-async function fetchPotakaitProducts(query: string): Promise<Product[]> {
+async function fetchPotakaitProducts(query: string, limit = 10): Promise<Product[]> {
   const products: Product[] = []
   const url = `https://www.potakait.com/index.php?route=product/search&search=${encodeURIComponent(query)}`
 
   try {
-    const response = await fetch(url, { next: { revalidate: 3600 } })
+    // Add timeout to prevent hanging requests
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 10000) // 10 second timeout
+
+    const response = await fetch(url, {
+      next: { revalidate: 3600 }, // Cache for 1 hour
+      signal: controller.signal,
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+      },
+    }).catch((error) => {
+      console.error(`Error fetching from Potaka IT: ${error.message}`)
+      return null
+    })
+
+    clearTimeout(timeoutId)
+
+    if (!response || !response.ok) {
+      console.warn(`Failed to fetch from Potaka IT: ${response?.status || "No response"}`)
+      return []
+    }
+
     const html = await response.text()
     const $ = cheerio.load(html)
 
-    $(".product-layout").each((_, element) => {
-      const name = $(element).find(".name a").text().trim()
-      const price = $(element).find(".price").text().trim().replace(/\s+/g, " ")
-      const image = $(element).find(".image img").attr("src") || ""
-      const productUrl = $(element).find(".name a").attr("href") || ""
-      const availability = $(element).find(".stock").text().includes("In Stock") ? "In Stock" : "Out of Stock"
+    // Process only up to the limit
+    $(".product-layout")
+      .slice(0, limit)
+      .each((_, element) => {
+        const name = $(element).find(".name a").text().trim()
+        const price = $(element).find(".price").text().trim().replace(/\s+/g, " ")
+        const image = $(element).find(".image img").attr("src") || ""
+        const productUrl = $(element).find(".name a").attr("href") || ""
+        const availability = $(element).find(".stock").text().includes("In Stock") ? "In Stock" : "Out of Stock"
 
-      products.push({
-        name,
-        price,
-        image,
-        availability,
-        source: "Potaka IT",
-        url: productUrl,
+        products.push({
+          name,
+          price,
+          image,
+          availability,
+          source: "Potaka IT",
+          url: productUrl,
+        })
       })
-    })
 
     return products
   } catch (error) {
@@ -324,14 +428,19 @@ async function fetchPotakaitProducts(query: string): Promise<Product[]> {
   }
 }
 
-async function fetchPCHouseProducts(query: string): Promise<Product[]> {
+async function fetchPCHouseProducts(query: string, limit = 10): Promise<Product[]> {
   const products: Product[] = []
   const url = `https://www.pchouse.com.bd/index.php?route=product/search&search=${encodeURIComponent(query)}`
 
   try {
+    // Add timeout to prevent hanging requests
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 10000) // 10 second timeout
+
     // Add headers to mimic a browser request
     const response = await fetch(url, {
       next: { revalidate: 3600 },
+      signal: controller.signal,
       headers: {
         "User-Agent":
           "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
@@ -341,31 +450,39 @@ async function fetchPCHouseProducts(query: string): Promise<Product[]> {
         "Upgrade-Insecure-Requests": "1",
         "Cache-Control": "max-age=0",
       },
+    }).catch((error) => {
+      console.error(`Error fetching from PC House: ${error.message}`)
+      return null
     })
 
-    if (!response.ok) {
-      throw new Error(`HTTP error! Status: ${response.status}`)
+    clearTimeout(timeoutId)
+
+    if (!response || !response.ok) {
+      console.warn(`Failed to fetch from PC House: ${response?.status || "No response"}`)
+      return []
     }
 
     const html = await response.text()
     const $ = cheerio.load(html)
 
-    $(".product-layout").each((_, element) => {
-      const name = $(element).find(".name a").text().trim()
-      const price = $(element).find(".price").text().trim().replace(/\s+/g, " ")
-      const image = $(element).find(".image img").attr("src") || ""
-      const productUrl = $(element).find(".name a").attr("href") || ""
-      const availability = $(element).find(".stock").text().includes("In Stock") ? "In Stock" : "Out of Stock"
+    $(".product-layout")
+      .slice(0, limit)
+      .each((_, element) => {
+        const name = $(element).find(".name a").text().trim()
+        const price = $(element).find(".price").text().trim().replace(/\s+/g, " ")
+        const image = $(element).find(".image img").attr("src") || ""
+        const productUrl = $(element).find(".name a").attr("href") || ""
+        const availability = $(element).find(".stock").text().includes("In Stock") ? "In Stock" : "Out of Stock"
 
-      products.push({
-        name,
-        price,
-        image,
-        availability,
-        source: "PC House",
-        url: productUrl,
+        products.push({
+          name,
+          price,
+          image,
+          availability,
+          source: "PC House",
+          url: productUrl,
+        })
       })
-    })
 
     return products
   } catch (error) {
@@ -374,39 +491,51 @@ async function fetchPCHouseProducts(query: string): Promise<Product[]> {
   }
 }
 
-async function fetchSkylandProducts(query: string): Promise<Product[]> {
+async function fetchSkylandProducts(query: string, limit = 10): Promise<Product[]> {
   const products: Product[] = []
   const url = `https://www.skyland.com.bd/index.php?route=product/search&search=${encodeURIComponent(query)}`
 
   try {
+    // Add timeout to prevent hanging requests
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 10000) // 10 second timeout
+
     const response = await fetch(url, {
       next: { revalidate: 3600 },
-      signal: AbortSignal.timeout(10000), // 10 second timeout
+      signal: controller.signal,
+    }).catch((error) => {
+      console.error(`Error fetching from Skyland: ${error.message}`)
+      return null
     })
 
-    if (!response.ok) {
-      throw new Error(`HTTP error! Status: ${response.status}`)
+    clearTimeout(timeoutId)
+
+    if (!response || !response.ok) {
+      console.warn(`Failed to fetch from Skyland: ${response?.status || "No response"}`)
+      return []
     }
 
     const html = await response.text()
     const $ = cheerio.load(html)
 
-    $(".product-layout").each((_, element) => {
-      const name = $(element).find(".name a").text().trim()
-      const price = $(element).find(".price").text().trim().replace(/\s+/g, " ")
-      const image = $(element).find(".image img").attr("src") || ""
-      const productUrl = $(element).find(".name a").attr("href") || ""
-      const availability = $(element).find(".stock").text().includes("In Stock") ? "In Stock" : "Out of Stock"
+    $(".product-layout")
+      .slice(0, limit)
+      .each((_, element) => {
+        const name = $(element).find(".name a").text().trim()
+        const price = $(element).find(".price").text().trim().replace(/\s+/g, " ")
+        const image = $(element).find(".image img").attr("src") || ""
+        const productUrl = $(element).find(".name a").attr("href") || ""
+        const availability = $(element).find(".stock").text().includes("In Stock") ? "In Stock" : "Out of Stock"
 
-      products.push({
-        name,
-        price,
-        image,
-        availability,
-        source: "Skyland",
-        url: productUrl,
+        products.push({
+          name,
+          price,
+          image,
+          availability,
+          source: "Skyland",
+          url: productUrl,
+        })
       })
-    })
 
     return products
   } catch (error) {

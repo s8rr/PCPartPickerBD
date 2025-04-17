@@ -18,6 +18,9 @@ import {
   MonitorIcon,
   HardDrive,
   CpuIcon as Gpu,
+  ChevronLeft,
+  ChevronRight,
+  Loader2,
 } from "lucide-react"
 import { SiteHeader } from "@/components/site-header"
 import { AttentionBanner } from "@/components/attention-banner"
@@ -37,6 +40,9 @@ export default function Home() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
   const [compareList, setCompareList] = useState<Product[]>([])
+  const [page, setPage] = useState(1)
+  const [hasMore, setHasMore] = useState(false)
+  const [productsPerPage] = useState(20) // Number of products to show per retailer
   const router = useRouter()
 
   // Load compare list from localStorage on component mount
@@ -52,14 +58,18 @@ export default function Home() {
     localStorage.setItem("compareList", JSON.stringify(compareList))
   }, [compareList])
 
-  const searchProducts = async () => {
+  const searchProducts = async (resetPage = true) => {
     if (!query.trim()) return
+
+    if (resetPage) {
+      setPage(1)
+    }
 
     setLoading(true)
     setError("")
 
     try {
-      const response = await fetch(`/api/products?query=${encodeURIComponent(query)}`)
+      const response = await fetch(`/api/products?query=${encodeURIComponent(query)}&limit=${productsPerPage}`)
 
       if (!response.ok) {
         throw new Error("Failed to fetch products")
@@ -67,12 +77,30 @@ export default function Home() {
 
       const data = await response.json()
       setProducts(data.products)
+
+      // Set hasMore based on whether we got a full page of results
+      setHasMore(data.products.length >= productsPerPage * 6) // 6 retailers
     } catch (err) {
       setError("An error occurred while fetching products")
       console.error(err)
     } finally {
       setLoading(false)
     }
+  }
+
+  const loadMoreProducts = async () => {
+    const nextPage = page + 1
+    setPage(nextPage)
+
+    // You could implement pagination on the backend and fetch more products here
+    // For now, we'll just simulate it by showing a loading state
+    setLoading(true)
+
+    // Simulate loading delay
+    setTimeout(() => {
+      setLoading(false)
+      setHasMore(false) // No more products after this page
+    }, 1000)
   }
 
   const addToCompare = (e: React.MouseEvent, product: Product) => {
@@ -139,10 +167,10 @@ export default function Home() {
                 className="pl-10"
               />
             </div>
-            <Button onClick={searchProducts} disabled={loading} className="min-w-[100px]">
+            <Button onClick={() => searchProducts()} disabled={loading} className="min-w-[100px]">
               {loading ? (
                 <div className="flex items-center">
-                  <div className="h-4 w-4 mr-2 animate-spin rounded-full border-2 border-solid border-current border-r-transparent" />
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                   Searching...
                 </div>
               ) : (
@@ -161,7 +189,7 @@ export default function Home() {
 
       {/* Results section */}
       <div className="container mx-auto py-8 px-4 pb-24">
-        {loading ? (
+        {loading && products.length === 0 ? (
           <div className="space-y-12">
             {/* Skeleton for StarTech Products */}
             <div className="bg-card rounded-lg p-6 shadow-sm">
@@ -204,36 +232,6 @@ export default function Home() {
                   .fill(0)
                   .map((_, index) => (
                     <ProductCardSkeleton key={`ultratech-skeleton-${index}`} />
-                  ))}
-              </div>
-            </div>
-
-            {/* Skeleton for Potaka IT Products */}
-            <div className="bg-card rounded-lg p-6 shadow-sm">
-              <div className="flex items-center gap-2 mb-6">
-                <Skeleton className="h-10 w-32" />
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
-                {Array(5)
-                  .fill(0)
-                  .map((_, index) => (
-                    <ProductCardSkeleton key={`potakait-skeleton-${index}`} />
-                  ))}
-              </div>
-            </div>
-
-            {/* Skeleton for PC House Products */}
-            <div className="bg-card rounded-lg p-6 shadow-sm">
-              <div className="flex items-center gap-2 mb-6">
-                <Skeleton className="h-10 w-32" />
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
-                {Array(5)
-                  .fill(0)
-                  .map((_, index) => (
-                    <ProductCardSkeleton key={`pchouse-skeleton-${index}`} />
                   ))}
               </div>
             </div>
@@ -347,6 +345,38 @@ export default function Home() {
                 </div>
               </div>
             )}
+
+            {/* Pagination controls */}
+            {hasMore && (
+              <div className="flex justify-center mt-8">
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setPage(Math.max(1, page - 1))}
+                    disabled={page === 1 || loading}
+                  >
+                    <ChevronLeft className="h-4 w-4 mr-1" />
+                    Previous
+                  </Button>
+                  <span className="text-sm text-muted-foreground px-2">Page {page}</span>
+                  <Button variant="outline" size="sm" onClick={loadMoreProducts} disabled={!hasMore || loading}>
+                    Next
+                    <ChevronRight className="h-4 w-4 ml-1" />
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {/* Loading indicator for pagination */}
+            {loading && products.length > 0 && (
+              <div className="flex justify-center mt-6">
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span>Loading more products...</span>
+                </div>
+              </div>
+            )}
           </div>
         ) : (
           !loading && (
@@ -363,7 +393,14 @@ export default function Home() {
                   <Cpu className="h-4 w-4" />
                   Build a PC
                 </Button>
-                <Button onClick={() => setQuery("ryzen")}>Search for Ryzen CPUs</Button>
+                <Button
+                  onClick={() => {
+                    setQuery("ryzen")
+                    searchProducts()
+                  }}
+                >
+                  Search for Ryzen CPUs
+                </Button>
               </div>
             </div>
           )

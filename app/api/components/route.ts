@@ -12,65 +12,27 @@ interface Component {
   specs?: Record<string, string>
 }
 
-// Update the GET function to sort results by relevance when searching
-// Modify the GET function to include sorting:
-
+// Update the GET function to include better error handling and performance optimizations
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams
   const type = searchParams.get("type")
   const search = searchParams.get("search")
+  const limit = Number.parseInt(searchParams.get("limit") || "20", 10) // Default to 20 components per retailer
 
   if (!type) {
     return NextResponse.json({ error: "Component type parameter is required" }, { status: 400 })
   }
 
   try {
-    // Create an array to hold promises for each retailer
-    const fetchPromises = []
-
-    // Add promises for each retailer with individual error handling
-    try {
-      fetchPromises.push(fetchStartechComponents(type, search))
-    } catch (error) {
-      console.error("Error setting up Startech fetch:", error)
-      // Continue with other retailers
-    }
-
-    try {
-      fetchPromises.push(fetchTechlandComponents(type, search))
-    } catch (error) {
-      console.error("Error setting up Techland fetch:", error)
-      // Continue with other retailers
-    }
-
-    try {
-      fetchPromises.push(fetchUltratechComponents(type, search))
-    } catch (error) {
-      console.error("Error setting up UltraTech fetch:", error)
-      // Continue with other retailers
-    }
-
-    try {
-      fetchPromises.push(fetchPotakaitComponents(type, search))
-    } catch (error) {
-      console.error("Error setting up Potaka IT fetch:", error)
-      // Continue with other retailers
-    }
-
-    try {
-      fetchPromises.push(fetchPCHouseComponents(type, search))
-    } catch (error) {
-      console.error("Error setting up PC House fetch:", error)
-      // Continue with other retailers
-    }
-
-    // In the GET function, add this after the other retailers:
-    try {
-      fetchPromises.push(fetchSkylandComponents(type, search))
-    } catch (error) {
-      console.error("Error setting up Skyland fetch:", error)
-      // Continue with other retailers
-    }
+    // Create an array of promises for parallel fetching
+    const fetchPromises = [
+      fetchStartechComponents(type, search, limit),
+      fetchTechlandComponents(type, search, limit),
+      fetchUltratechComponents(type, search, limit),
+      fetchPotakaitComponents(type, search, limit),
+      fetchPCHouseComponents(type, search, limit),
+      fetchSkylandComponents(type, search, limit),
+    ]
 
     // Use Promise.allSettled to handle individual promise failures
     const results = await Promise.allSettled(fetchPromises)
@@ -102,9 +64,8 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// Update the fetchStartechComponents function to handle timeouts better
-
-async function fetchStartechComponents(type: string, search?: string | null): Promise<Component[]> {
+// Optimized version of fetchStartechComponents
+async function fetchStartechComponents(type: string, search?: string | null, limit = 20): Promise<Component[]> {
   const components: Component[] = []
   let url = ""
 
@@ -147,12 +108,12 @@ async function fetchStartechComponents(type: string, search?: string | null): Pr
   }
 
   try {
-    // Add timeout and retry logic
+    // Add timeout to prevent hanging requests
     const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), 15000) // 15 second timeout
+    const timeoutId = setTimeout(() => controller.abort(), 10000) // 10 second timeout
 
     const response = await fetch(url, {
-      next: { revalidate: 3600 },
+      next: { revalidate: 3600 }, // Cache for 1 hour
       signal: controller.signal,
       headers: {
         "User-Agent":
@@ -173,24 +134,18 @@ async function fetchStartechComponents(type: string, search?: string | null): Pr
     const html = await response.text()
     const $ = cheerio.load(html)
 
-    // Process only the first 20 items to avoid timeouts
-    const maxItems = 20
-    let itemCount = 0
-
-    const productPromises = $(".p-item")
-      .slice(0, maxItems)
-      .map(async (_, element) => {
-        if (itemCount >= maxItems) return null
-        itemCount++
-
+    // Process only up to the limit
+    $(".p-item")
+      .slice(0, limit)
+      .each((_, element) => {
         const name = $(element).find(".p-item-name").text().trim()
 
-        // If searching, filter by component type and relevance
+        // If searching, filter by component type
         if (search) {
           // Skip if this doesn't match our component type
           const isMatchingType = matchesComponentType(name, type)
           if (!isMatchingType) {
-            return null
+            return
           }
         }
 
@@ -228,7 +183,7 @@ async function fetchStartechComponents(type: string, search?: string | null): Pr
         const listingAvailability = $(element).find(".p-item-stock").text().trim()
         const availability = listingAvailability.toLowerCase().includes("in stock") ? "In Stock" : "Out of Stock"
 
-        return {
+        components.push({
           name,
           price,
           image,
@@ -236,20 +191,8 @@ async function fetchStartechComponents(type: string, search?: string | null): Pr
           source: "Startech",
           url: productUrl,
           specs,
-        }
+        })
       })
-      .get()
-
-    // Use Promise.allSettled to handle individual promise failures
-    const settledResults = await Promise.allSettled(productPromises)
-
-    // Extract components from fulfilled promises
-    const results = settledResults
-      .filter((result): result is PromiseFulfilledResult<Component | null> => result.status === "fulfilled")
-      .map((result) => result.value)
-      .filter((result): result is Component => result !== null)
-
-    components.push(...results)
 
     return components
   } catch (error) {
@@ -258,9 +201,8 @@ async function fetchStartechComponents(type: string, search?: string | null): Pr
   }
 }
 
-// Update the fetchTechlandComponents function to handle timeouts better
-
-async function fetchTechlandComponents(type: string, search?: string | null): Promise<Component[]> {
+// Optimized version of fetchTechlandComponents
+async function fetchTechlandComponents(type: string, search?: string | null, limit = 20): Promise<Component[]> {
   const components: Component[] = []
   let url = ""
 
@@ -303,12 +245,12 @@ async function fetchTechlandComponents(type: string, search?: string | null): Pr
   }
 
   try {
-    // Add timeout and retry logic
+    // Add timeout to prevent hanging requests
     const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), 15000) // 15 second timeout
+    const timeoutId = setTimeout(() => controller.abort(), 10000) // 10 second timeout
 
     const response = await fetch(url, {
-      next: { revalidate: 3600 },
+      next: { revalidate: 3600 }, // Cache for 1 hour
       signal: controller.signal,
       headers: {
         "User-Agent":
@@ -329,16 +271,10 @@ async function fetchTechlandComponents(type: string, search?: string | null): Pr
     const html = await response.text()
     const $ = cheerio.load(html)
 
-    // Process only the first 20 items to avoid timeouts
-    const maxItems = 20
-    let itemCount = 0
-
-    const productPromises = $(".product-layout")
-      .slice(0, maxItems)
-      .map(async (_, element) => {
-        if (itemCount >= maxItems) return null
-        itemCount++
-
+    // Process only up to the limit
+    $(".product-layout")
+      .slice(0, limit)
+      .each((_, element) => {
         const name = $(element).find(".name a").text().trim()
 
         // If searching, filter by component type
@@ -346,7 +282,7 @@ async function fetchTechlandComponents(type: string, search?: string | null): Pr
           // Skip if this doesn't match our component type
           const isMatchingType = matchesComponentType(name, type)
           if (!isMatchingType) {
-            return null
+            return
           }
         }
 
@@ -384,7 +320,7 @@ async function fetchTechlandComponents(type: string, search?: string | null): Pr
         const listingAvailability = $(element).find(".stock").text().trim()
         const availability = listingAvailability.toLowerCase().includes("in stock") ? "In Stock" : "Out of Stock"
 
-        return {
+        components.push({
           name,
           price,
           image,
@@ -392,20 +328,8 @@ async function fetchTechlandComponents(type: string, search?: string | null): Pr
           source: "Techland",
           url: productUrl,
           specs,
-        }
+        })
       })
-      .get()
-
-    // Use Promise.allSettled to handle individual promise failures
-    const settledResults = await Promise.allSettled(productPromises)
-
-    // Extract components from fulfilled promises
-    const results = settledResults
-      .filter((result): result is PromiseFulfilledResult<Component | null> => result.status === "fulfilled")
-      .map((result) => result.value)
-      .filter((result): result is Component => result !== null)
-
-    components.push(...results)
 
     return components
   } catch (error) {
@@ -414,9 +338,10 @@ async function fetchTechlandComponents(type: string, search?: string | null): Pr
   }
 }
 
-// Add the new component scraping functions with search support
+// Optimized versions of the other retailer functions follow the same pattern
+// I'll include UltraTech, Potaka IT, PC House, and Skyland with similar optimizations
 
-async function fetchUltratechComponents(type: string, search?: string | null): Promise<Component[]> {
+async function fetchUltratechComponents(type: string, search?: string | null, limit = 20): Promise<Component[]> {
   const components: Component[] = []
   let url = ""
 
@@ -459,12 +384,36 @@ async function fetchUltratechComponents(type: string, search?: string | null): P
   }
 
   try {
-    const response = await fetch(url, { next: { revalidate: 3600 } })
+    // Add timeout to prevent hanging requests
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 10000) // 10 second timeout
+
+    const response = await fetch(url, {
+      next: { revalidate: 3600 }, // Cache for 1 hour
+      signal: controller.signal,
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+      },
+    }).catch((error) => {
+      console.error(`Error fetching from UltraTech: ${error.message}`)
+      return null
+    })
+
+    clearTimeout(timeoutId)
+
+    if (!response || !response.ok) {
+      console.warn(`Failed to fetch from UltraTech: ${response?.status || "No response"}`)
+      return []
+    }
+
     const html = await response.text()
     const $ = cheerio.load(html)
 
-    const productPromises = $(".product-layout")
-      .map(async (_, element) => {
+    // Process only up to the limit
+    $(".product-layout")
+      .slice(0, limit)
+      .each((_, element) => {
         const name = $(element).find(".name a").text().trim()
 
         // If searching, filter by component type
@@ -472,7 +421,7 @@ async function fetchUltratechComponents(type: string, search?: string | null): P
           // Skip if this doesn't match our component type
           const isMatchingType = matchesComponentType(name, type)
           if (!isMatchingType) {
-            return null
+            return
           }
         }
 
@@ -506,58 +455,11 @@ async function fetchUltratechComponents(type: string, search?: string | null): P
           if (cacheMatch) specs["Cache"] = cacheMatch[0]
         }
 
-        // Fetch the product page to get accurate availability
-        let availability = "Unknown"
-        try {
-          const productResponse = await fetch(productUrl, { next: { revalidate: 3600 } })
-          const productHtml = await productResponse.text()
-          const product$ = cheerio.load(productHtml)
+        // Use availability from listing page
+        const listingAvailability = $(element).find(".stock").text().trim()
+        const availability = listingAvailability.toLowerCase().includes("in stock") ? "In Stock" : "Out of Stock"
 
-          // Look for the Status field in the product details
-          product$(".product-stats li").each((_, infoItem) => {
-            const label = product$(infoItem).find(".product-stats-title").text().trim()
-            if (label === "Status:") {
-              availability = product$(infoItem).find(".product-stats-text").text().trim()
-            }
-          })
-
-          // If we couldn't find the status, check other common locations
-          if (availability === "Unknown") {
-            availability =
-              product$(".stock").text().trim() ||
-              product$(".availability").text().trim() ||
-              product$(".product-stock").text().trim()
-          }
-
-          // Normalize availability
-          if (!availability || availability === "Unknown") {
-            availability = "Out of Stock"
-          } else if (
-            availability.toLowerCase().includes("in stock") ||
-            availability.toLowerCase().includes("available") ||
-            availability.toLowerCase().includes("pre order")
-          ) {
-            availability = "In Stock"
-          } else {
-            availability = "Out of Stock"
-          }
-        } catch (error) {
-          console.error(`Error fetching product page for ${name}:`, error)
-          // Fallback to the availability from the listing page
-          const listingAvailability = $(element).find(".stock").text().trim()
-          if (!listingAvailability) {
-            availability = "Out of Stock"
-          } else if (
-            listingAvailability.toLowerCase().includes("in stock") ||
-            listingAvailability.toLowerCase().includes("available")
-          ) {
-            availability = "In Stock"
-          } else {
-            availability = "Out of Stock"
-          }
-        }
-
-        return {
+        components.push({
           name,
           price,
           image,
@@ -565,23 +467,17 @@ async function fetchUltratechComponents(type: string, search?: string | null): P
           source: "UltraTech",
           url: productUrl,
           specs,
-        }
+        })
       })
-      .get()
-
-    const results = await Promise.all(productPromises)
-    // Filter out null results (from search filtering)
-    const validResults = results.filter((result) => result !== null) as Component[]
-    components.push(...validResults)
 
     return components
   } catch (error) {
-    console.error(`Error fetching ${type} from UltraTech:`, error)
+    console.error(`Error fetching ${type} from UltraTech:`, error instanceof Error ? error.message : "Unknown error")
     return []
   }
 }
 
-async function fetchPotakaitComponents(type: string, search?: string | null): Promise<Component[]> {
+async function fetchPotakaitComponents(type: string, search?: string | null, limit = 20): Promise<Component[]> {
   const components: Component[] = []
   let url = ""
 
@@ -624,31 +520,36 @@ async function fetchPotakaitComponents(type: string, search?: string | null): Pr
   }
 
   try {
+    // Add timeout to prevent hanging requests
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 10000) // 10 second timeout
+
     const response = await fetch(url, {
-      next: { revalidate: 3600 },
-      // Add timeout to prevent hanging requests
-      signal: AbortSignal.timeout(10000),
+      next: { revalidate: 3600 }, // Cache for 1 hour
+      signal: controller.signal,
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+      },
     }).catch((error) => {
-      console.error(`Error fetching Potaka IT listing page: ${error.message}`)
+      console.error(`Error fetching from Potaka IT: ${error.message}`)
       return null
     })
+
+    clearTimeout(timeoutId)
 
     if (!response || !response.ok) {
       console.warn(`Failed to fetch from Potaka IT: ${response?.status || "No response"}`)
       return []
     }
 
-    const html = await response.text().catch((error) => {
-      console.error(`Error reading Potaka IT response: ${error.message}`)
-      return ""
-    })
-
-    if (!html) return []
-
+    const html = await response.text()
     const $ = cheerio.load(html)
 
-    const productPromises = $(".product-layout")
-      .map(async (_, element) => {
+    // Process only up to the limit
+    $(".product-layout")
+      .slice(0, limit)
+      .each((_, element) => {
         const name = $(element).find(".name a").text().trim()
 
         // If searching, filter by component type
@@ -656,7 +557,7 @@ async function fetchPotakaitComponents(type: string, search?: string | null): Pr
           // Skip if this doesn't match our component type
           const isMatchingType = matchesComponentType(name, type)
           if (!isMatchingType) {
-            return null
+            return
           }
         }
 
@@ -690,68 +591,11 @@ async function fetchPotakaitComponents(type: string, search?: string | null): Pr
           if (cacheMatch) specs["Cache"] = cacheMatch[0]
         }
 
-        // Use availability from listing page as fallback
+        // Use availability from listing page
         const listingAvailability = $(element).find(".stock").text().trim()
-        let availability = listingAvailability.toLowerCase().includes("in stock") ? "In Stock" : "Out of Stock"
+        const availability = listingAvailability.toLowerCase().includes("in stock") ? "In Stock" : "Out of Stock"
 
-        // Only try to fetch product page if URL exists and is valid
-        if (productUrl && productUrl.startsWith("http")) {
-          try {
-            const productResponse = await fetch(productUrl, {
-              next: { revalidate: 3600 },
-              // Add timeout to prevent hanging requests
-              signal: AbortSignal.timeout(5000),
-            }).catch((error) => {
-              console.warn(`Skipping product page fetch for ${name}: ${error.message}`)
-              return null
-            })
-
-            if (productResponse && productResponse.ok) {
-              const productHtml = await productResponse.text()
-              const product$ = cheerio.load(productHtml)
-
-              // Look for the Status field in the product details
-              product$(".product-stats li").each((_, infoItem) => {
-                const label = product$(infoItem).find(".product-stats-title").text().trim()
-                if (label === "Status:") {
-                  availability = product$(infoItem).find(".product-stats-text").text().trim()
-                }
-              })
-
-              // If we couldn't find the status, check other common locations
-              if (!availability) {
-                const stockText =
-                  product$(".stock").text().trim() ||
-                  product$(".availability").text().trim() ||
-                  product$(".product-stock").text().trim()
-
-                if (stockText) {
-                  availability = stockText.toLowerCase().includes("in stock") ? "In Stock" : "Out of Stock"
-                }
-              }
-            }
-          } catch (error) {
-            console.warn(
-              `Error processing product page for ${name}: ${error instanceof Error ? error.message : "Unknown error"}`,
-            )
-            // We'll use the fallback availability from above
-          }
-        }
-
-        // Normalize availability
-        if (!availability) {
-          availability = "Out of Stock"
-        } else if (
-          availability.toLowerCase().includes("in stock") ||
-          availability.toLowerCase().includes("available") ||
-          availability.toLowerCase().includes("pre order")
-        ) {
-          availability = "In Stock"
-        } else {
-          availability = "Out of Stock"
-        }
-
-        return {
+        components.push({
           name,
           price,
           image,
@@ -759,20 +603,8 @@ async function fetchPotakaitComponents(type: string, search?: string | null): Pr
           source: "Potaka IT",
           url: productUrl,
           specs,
-        }
+        })
       })
-      .get()
-
-    // Use Promise.allSettled to handle any rejected promises
-    const settledResults = await Promise.allSettled(productPromises)
-
-    // Filter out rejected promises and extract values from fulfilled ones
-    const results = settledResults
-      .filter((result): result is PromiseFulfilledResult<Component | null> => result.status === "fulfilled")
-      .map((result) => result.value)
-      .filter((result): result is Component => result !== null)
-
-    components.push(...results)
 
     return components
   } catch (error) {
@@ -781,7 +613,7 @@ async function fetchPotakaitComponents(type: string, search?: string | null): Pr
   }
 }
 
-async function fetchPCHouseComponents(type: string, search?: string | null): Promise<Component[]> {
+async function fetchPCHouseComponents(type: string, search?: string | null, limit = 20): Promise<Component[]> {
   const components: Component[] = []
   let url = ""
 
@@ -824,29 +656,36 @@ async function fetchPCHouseComponents(type: string, search?: string | null): Pro
   }
 
   try {
-    // Add headers to mimic a browser request
+    // Add timeout to prevent hanging requests
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 10000) // 10 second timeout
+
     const response = await fetch(url, {
-      next: { revalidate: 3600 },
+      next: { revalidate: 3600 }, // Cache for 1 hour
+      signal: controller.signal,
       headers: {
         "User-Agent":
           "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
-        Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
-        "Accept-Language": "en-US,en;q=0.5",
-        Connection: "keep-alive",
-        "Upgrade-Insecure-Requests": "1",
-        "Cache-Control": "max-age=0",
       },
+    }).catch((error) => {
+      console.error(`Error fetching from PC House: ${error.message}`)
+      return null
     })
 
-    if (!response.ok) {
-      throw new Error(`HTTP error! Status: ${response.status}`)
+    clearTimeout(timeoutId)
+
+    if (!response || !response.ok) {
+      console.warn(`Failed to fetch from PC House: ${response?.status || "No response"}`)
+      return []
     }
 
     const html = await response.text()
     const $ = cheerio.load(html)
 
-    const productPromises = $(".product-layout")
-      .map(async (_, element) => {
+    // Process only up to the limit
+    $(".product-layout")
+      .slice(0, limit)
+      .each((_, element) => {
         const name = $(element).find(".name a").text().trim()
 
         // If searching, filter by component type
@@ -854,7 +693,7 @@ async function fetchPCHouseComponents(type: string, search?: string | null): Pro
           // Skip if this doesn't match our component type
           const isMatchingType = matchesComponentType(name, type)
           if (!isMatchingType) {
-            return null
+            return
           }
         }
 
@@ -888,87 +727,11 @@ async function fetchPCHouseComponents(type: string, search?: string | null): Pro
           if (cacheMatch) specs["Cache"] = cacheMatch[0]
         }
 
-        // Skip fetching product page if URL is missing
-        if (!productUrl) {
-          return {
-            name,
-            price,
-            image,
-            availability: "Unknown",
-            source: "PC House",
-            url: productUrl,
-            specs,
-          }
-        }
+        // Use availability from listing page
+        const listingAvailability = $(element).find(".stock").text().trim()
+        const availability = listingAvailability.toLowerCase().includes("in stock") ? "In Stock" : "Out of Stock"
 
-        // Fetch the product page to get accurate availability
-        let availability = "Unknown"
-        try {
-          const productResponse = await fetch(productUrl, {
-            next: { revalidate: 3600 },
-            headers: {
-              "User-Agent":
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
-              Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
-              "Accept-Language": "en-US,en;q=0.5",
-              Connection: "keep-alive",
-              "Upgrade-Insecure-Requests": "1",
-              "Cache-Control": "max-age=0",
-            },
-          })
-
-          if (!productResponse.ok) {
-            throw new Error(`HTTP error! Status: ${productResponse.status}`)
-          }
-
-          const productHtml = await productResponse.text()
-          const product$ = cheerio.load(productHtml)
-
-          // Look for the Status field in the product details
-          product$(".product-stats li").each((_, infoItem) => {
-            const label = product$(infoItem).find(".product-stats-title").text().trim()
-            if (label === "Status:") {
-              availability = product$(infoItem).find(".product-stats-text").text().trim()
-            }
-          })
-
-          // If we couldn't find the status, check other common locations
-          if (availability === "Unknown") {
-            availability =
-              product$(".stock").text().trim() ||
-              product$(".availability").text().trim() ||
-              product$(".product-stock").text().trim()
-          }
-
-          // Normalize availability
-          if (!availability || availability === "Unknown") {
-            availability = "Out of Stock"
-          } else if (
-            availability.toLowerCase().includes("in stock") ||
-            availability.toLowerCase().includes("available") ||
-            availability.toLowerCase().includes("pre order")
-          ) {
-            availability = "In Stock"
-          } else {
-            availability = "Out of Stock"
-          }
-        } catch (error) {
-          console.error(`Error fetching product page for ${name}:`, error)
-          // Fallback to the availability from the listing page
-          const listingAvailability = $(element).find(".stock").text().trim()
-          if (!listingAvailability) {
-            availability = "Out of Stock"
-          } else if (
-            listingAvailability.toLowerCase().includes("in stock") ||
-            listingAvailability.toLowerCase().includes("available")
-          ) {
-            availability = "In Stock"
-          } else {
-            availability = "Out of Stock"
-          }
-        }
-
-        return {
+        components.push({
           name,
           price,
           image,
@@ -976,32 +739,19 @@ async function fetchPCHouseComponents(type: string, search?: string | null): Pro
           source: "PC House",
           url: productUrl,
           specs,
-        }
+        })
       })
-      .get()
-
-    // Use Promise.allSettled instead of Promise.all to handle individual promise rejections
-    const settledResults = await Promise.allSettled(productPromises)
-
-    // Filter out rejected promises and extract values from fulfilled ones
-    const results = settledResults
-      .filter((result): result is PromiseFulfilledResult<Component | null> => result.status === "fulfilled")
-      .map((result) => result.value)
-      .filter((result): result is Component => result !== null)
-
-    components.push(...results)
 
     return components
   } catch (error) {
-    console.error(`Error fetching ${type} from PC House:`, error)
-    // Return an empty array instead of throwing an error
+    console.error(`Error fetching ${type} from PC House:`, error instanceof Error ? error.message : "Unknown error")
     return []
   }
 }
 
 // Add this new function after the existing fetchPCHouseComponents function:
 
-async function fetchSkylandComponents(type: string, search?: string | null): Promise<Component[]> {
+async function fetchSkylandComponents(type: string, search?: string | null, limit = 20): Promise<Component[]> {
   const components: Component[] = []
   let url = ""
 
@@ -1044,12 +794,12 @@ async function fetchSkylandComponents(type: string, search?: string | null): Pro
   }
 
   try {
-    // Add timeout and retry logic
+    // Add timeout to prevent hanging requests
     const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), 15000) // 15 second timeout
+    const timeoutId = setTimeout(() => controller.abort(), 10000) // 10 second timeout
 
     const response = await fetch(url, {
-      next: { revalidate: 3600 },
+      next: { revalidate: 3600 }, // Cache for 1 hour
       signal: controller.signal,
       headers: {
         "User-Agent":
@@ -1070,16 +820,10 @@ async function fetchSkylandComponents(type: string, search?: string | null): Pro
     const html = await response.text()
     const $ = cheerio.load(html)
 
-    // Process only the first 20 items to avoid timeouts
-    const maxItems = 20
-    let itemCount = 0
-
-    const productPromises = $(".product-layout")
-      .slice(0, maxItems)
-      .map(async (_, element) => {
-        if (itemCount >= maxItems) return null
-        itemCount++
-
+    // Process only up to the limit
+    $(".product-layout")
+      .slice(0, limit)
+      .each((_, element) => {
         const name = $(element).find(".name a").text().trim()
 
         // If searching, filter by component type
@@ -1087,7 +831,7 @@ async function fetchSkylandComponents(type: string, search?: string | null): Pro
           // Skip if this doesn't match our component type
           const isMatchingType = matchesComponentType(name, type)
           if (!isMatchingType) {
-            return null
+            return
           }
         }
 
@@ -1121,11 +865,11 @@ async function fetchSkylandComponents(type: string, search?: string | null): Pro
           if (cacheMatch) specs["Cache"] = cacheMatch[0]
         }
 
-        // Use availability from listing page instead of fetching product page
+        // Use availability from listing page
         const listingAvailability = $(element).find(".stock").text().trim()
         const availability = listingAvailability.toLowerCase().includes("in stock") ? "In Stock" : "Out of Stock"
 
-        return {
+        components.push({
           name,
           price,
           image,
@@ -1133,20 +877,8 @@ async function fetchSkylandComponents(type: string, search?: string | null): Pro
           source: "Skyland",
           url: productUrl,
           specs,
-        }
+        })
       })
-      .get()
-
-    // Use Promise.allSettled to handle individual promise failures
-    const settledResults = await Promise.allSettled(productPromises)
-
-    // Extract components from fulfilled promises
-    const results = settledResults
-      .filter((result): result is PromiseFulfilledResult<Component | null> => result.status === "fulfilled")
-      .map((result) => result.value)
-      .filter((result): result is Component => result !== null)
-
-    components.push(...results)
 
     return components
   } catch (error) {
@@ -1155,7 +887,7 @@ async function fetchSkylandComponents(type: string, search?: string | null): Pro
   }
 }
 
-// Helper function to determine if a product matches the component type
+// Keep the helper functions for component type matching and search relevance
 function matchesComponentType(productName: string, type: string): boolean {
   const productNameLower = productName.toLowerCase()
 
@@ -1238,10 +970,6 @@ function matchesComponentType(productName: string, type: string): boolean {
   }
 }
 
-// Add this helper function to improve search matching in the API
-// Add it right after the matchesComponentType function
-
-// Helper function to calculate search relevance score
 function calculateSearchRelevance(productName: string, searchQuery: string): number {
   const productNameLower = productName.toLowerCase()
   const searchQueryLower = searchQuery.toLowerCase()
