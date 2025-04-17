@@ -1,3 +1,37 @@
+# PCPartPickerBD
+
+A Bangladeshi PC part price comparison and builder web application.
+
+This project allows users to compare prices from different tech retailers in Bangladesh and build custom PC configurations.
+
+Live: [pcpartpicker.sabbir.lol](https://pcpartpicker.sabbir.lol)
+
+## Features
+
+- Compare prices of PC components from various Bangladeshi retail websites
+- Build and save custom PC configurations
+- Simple, clean and fast UI
+- Easily expandable to support more retailers
+
+## Tech Stack
+
+- **Framework:** Next.js
+- **Styling:** Tailwind CSS
+- **Icons:** Lucide React
+- **Package Manager:** pnpm
+
+## Getting Started
+
+### Installation
+
+```bash
+git clone https://github.com/s8rr/PCPartPickerBD.git
+cd PCPartPickerBD
+pnpm install
+pnpm dev
+```
+2. Iinstall dependencies:
+
 ```shellscript
 npm install
 # or
