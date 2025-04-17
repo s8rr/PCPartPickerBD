@@ -22,7 +22,8 @@ const guideCategories = [
     title: "CPU Cooler Installation",
     description: "Properly mount air or liquid coolers for optimal thermal performance",
     icon: Fan,
-    image: "https://www.wikihow.com/images/thumb/d/d2/Install-a-CPU-Cooler-in-an-AMD-Motherboard-Step-4-Version-3.jpg/v4-460px-Install-a-CPU-Cooler-in-an-AMD-Motherboard-Step-4-Version-3.jpg",
+    image:
+      "https://www.wikihow.com/images/thumb/d/d2/Install-a-CPU-Cooler-in-an-AMD-Motherboard-Step-4-Version-3.jpg/v4-460px-Install-a-CPU-Cooler-in-an-AMD-Motherboard-Step-4-Version-3.jpg",
     difficulty: "Moderate",
     videoUrl: "https://www.youtube.com/embed/WbvKjsuznBk",
   },
@@ -58,7 +59,8 @@ const guideCategories = [
     title: "Graphics Card Installation",
     description: "Safely install your GPU and connect power cables correctly",
     icon: Tv2,
-    image: "https://km-ap.asus.com/uploads/PhotoLibrarys/8b6897a7-27e5-4451-84a2-b4aee2b25f15/20240229152408449_2024022915_23_35ASUSKnowledgeManagement.png",
+    image:
+      "https://km-ap.asus.com/uploads/PhotoLibrarys/8b6897a7-27e5-4451-84a2-b4aee2b25f15/20240229152408449_2024022915_23_35ASUSKnowledgeManagement.png",
     difficulty: "Easy",
     videoUrl: "https://www.youtube.com/embed/YVbjl69z3HE",
   },
@@ -85,7 +87,8 @@ const guideCategories = [
     title: "Complete PC Build Guide",
     description: "Step-by-step guide to building a complete PC from scratch",
     icon: BookOpen,
-    image: "https://i.ytimg.com/vi/s1fxZ-VWs2U/hq720.jpg?sqp=-oaymwEhCK4FEIIDSFryq4qpAxMIARUAAAAAGAElAADIQj0AgKJD&rs=AOn4CLDvGDcROE02ydlnR1qLSWGm9AImcQ",
+    image:
+      "https://i.ytimg.com/vi/s1fxZ-VWs2U/hq720.jpg?sqp=-oaymwEhCK4FEIIDSFryq4qpAxMIARUAAAAAGAElAADIQj0AgKJD&rs=AOn4CLDvGDcROE02ydlnR1qLSWGm9AImcQ",
     difficulty: "Advanced",
     videoUrl: "https://www.youtube.com/embed/s1fxZ-VWs2U",
   },

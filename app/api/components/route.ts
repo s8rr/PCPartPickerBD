@@ -64,6 +64,14 @@ export async function GET(request: NextRequest) {
       // Continue with other retailers
     }
 
+    // In the GET function, add this after the other retailers:
+    try {
+      fetchPromises.push(fetchSkylandComponents(type, search))
+    } catch (error) {
+      console.error("Error setting up Skyland fetch:", error)
+      // Continue with other retailers
+    }
+
     // Use Promise.allSettled to handle individual promise failures
     const results = await Promise.allSettled(fetchPromises)
 
@@ -987,6 +995,162 @@ async function fetchPCHouseComponents(type: string, search?: string | null): Pro
   } catch (error) {
     console.error(`Error fetching ${type} from PC House:`, error)
     // Return an empty array instead of throwing an error
+    return []
+  }
+}
+
+// Add this new function after the existing fetchPCHouseComponents function:
+
+async function fetchSkylandComponents(type: string, search?: string | null): Promise<Component[]> {
+  const components: Component[] = []
+  let url = ""
+
+  // If search is provided, use search URL instead of category URL
+  if (search) {
+    url = `https://www.skyland.com.bd/index.php?route=product/search&search=${encodeURIComponent(search)}`
+  } else {
+    // Map component type to Skyland URL
+    switch (type) {
+      case "cpu":
+        url = "https://www.skyland.com.bd/processor"
+        break
+      case "cpu-cooler":
+        url = "https://www.skyland.com.bd/cpu-cooler"
+        break
+      case "motherboard":
+        url = "https://www.skyland.com.bd/motherboard"
+        break
+      case "memory":
+        url = "https://www.skyland.com.bd/ram"
+        break
+      case "storage":
+        url = "https://www.skyland.com.bd/storage-device"
+        break
+      case "video-card":
+        url = "https://www.skyland.com.bd/graphics-card"
+        break
+      case "case":
+        url = "https://www.skyland.com.bd/casing"
+        break
+      case "power-supply":
+        url = "https://www.skyland.com.bd/power-supply"
+        break
+      case "monitor":
+        url = "https://www.skyland.com.bd/monitor"
+        break
+      default:
+        return []
+    }
+  }
+
+  try {
+    // Add timeout and retry logic
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 15000) // 15 second timeout
+
+    const response = await fetch(url, {
+      next: { revalidate: 3600 },
+      signal: controller.signal,
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+      },
+    }).catch((error) => {
+      console.error(`Error fetching from Skyland: ${error.message}`)
+      return null
+    })
+
+    clearTimeout(timeoutId)
+
+    if (!response || !response.ok) {
+      console.warn(`Failed to fetch from Skyland: ${response?.status || "No response"}`)
+      return []
+    }
+
+    const html = await response.text()
+    const $ = cheerio.load(html)
+
+    // Process only the first 20 items to avoid timeouts
+    const maxItems = 20
+    let itemCount = 0
+
+    const productPromises = $(".product-layout")
+      .slice(0, maxItems)
+      .map(async (_, element) => {
+        if (itemCount >= maxItems) return null
+        itemCount++
+
+        const name = $(element).find(".name a").text().trim()
+
+        // If searching, filter by component type
+        if (search) {
+          // Skip if this doesn't match our component type
+          const isMatchingType = matchesComponentType(name, type)
+          if (!isMatchingType) {
+            return null
+          }
+        }
+
+        // Get both regular and special prices if available
+        let price = $(element).find(".price").text().trim().replace(/\s+/g, " ")
+        const oldPrice = $(element).find(".price-old").text().trim()
+        const newPrice = $(element).find(".price-new").text().trim()
+
+        // If both old and new prices exist, combine them
+        if (oldPrice && newPrice) {
+          price = `${newPrice} ${oldPrice}`
+        }
+
+        const image = $(element).find(".image img").attr("src") || ""
+        const productUrl = $(element).find(".name a").attr("href") || ""
+
+        // Extract basic specs from the name for CPUs
+        const specs: Record<string, string> = {}
+        if (type === "cpu") {
+          // Try to extract CPU specs from the name
+          const clockSpeedMatch = name.match(/(\d+\.\d+)GHz/)
+          if (clockSpeedMatch) specs["Clock Speed"] = clockSpeedMatch[0]
+
+          const coreMatch = name.match(/(\d+)[ -]Core/)
+          if (coreMatch) specs["Cores"] = coreMatch[1]
+
+          const threadMatch = name.match(/(\d+)[ -]Thread/)
+          if (threadMatch) specs["Threads"] = threadMatch[1]
+
+          const cacheMatch = name.match(/(\d+)MB Cache/)
+          if (cacheMatch) specs["Cache"] = cacheMatch[0]
+        }
+
+        // Use availability from listing page instead of fetching product page
+        const listingAvailability = $(element).find(".stock").text().trim()
+        const availability = listingAvailability.toLowerCase().includes("in stock") ? "In Stock" : "Out of Stock"
+
+        return {
+          name,
+          price,
+          image,
+          availability,
+          source: "Skyland",
+          url: productUrl,
+          specs,
+        }
+      })
+      .get()
+
+    // Use Promise.allSettled to handle individual promise failures
+    const settledResults = await Promise.allSettled(productPromises)
+
+    // Extract components from fulfilled promises
+    const results = settledResults
+      .filter((result): result is PromiseFulfilledResult<Component | null> => result.status === "fulfilled")
+      .map((result) => result.value)
+      .filter((result): result is Component => result !== null)
+
+    components.push(...results)
+
+    return components
+  } catch (error) {
+    console.error(`Error fetching ${type} from Skyland:`, error instanceof Error ? error.message : "Unknown error")
     return []
   }
 }

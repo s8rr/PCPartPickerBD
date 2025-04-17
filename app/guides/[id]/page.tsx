@@ -48,13 +48,15 @@ const guides = {
         title: "Prepare your workspace",
         description:
           "Clear a well-lit, static-free workspace. Ideally, work on a hard, non-carpeted surface. Consider using an anti-static wrist strap for additional protection.",
-        image: "https://www.wikihow.com/images/thumb/c/c7/Install-a-CPU-Cooler-in-an-AMD-Motherboard-Step-2-Version-3.jpg/v4-728px-Install-a-CPU-Cooler-in-an-AMD-Motherboard-Step-2-Version-3.jpg.webp",
+        image:
+          "https://www.wikihow.com/images/thumb/c/c7/Install-a-CPU-Cooler-in-an-AMD-Motherboard-Step-2-Version-3.jpg/v4-728px-Install-a-CPU-Cooler-in-an-AMD-Motherboard-Step-2-Version-3.jpg.webp",
       },
       {
         title: "Open the CPU socket",
         description:
           "For Intel: Lift the socket lever up and then out to the side, then lift the socket cover. For AMD: Pull the lever out and up to unlock the socket.",
-        image: "https://www.wikihow.com/images/thumb/e/e6/Install-a-CPU-Cooler-in-an-AMD-Motherboard-Step-3-Version-3.jpg/v4-728px-Install-a-CPU-Cooler-in-an-AMD-Motherboard-Step-3-Version-3.jpg.webp",
+        image:
+          "https://www.wikihow.com/images/thumb/e/e6/Install-a-CPU-Cooler-in-an-AMD-Motherboard-Step-3-Version-3.jpg/v4-728px-Install-a-CPU-Cooler-in-an-AMD-Motherboard-Step-3-Version-3.jpg.webp",
       },
       {
         title: "Align the CPU correctly",
@@ -78,13 +80,15 @@ const guides = {
         title: "Apply thermal paste",
         description:
           "Apply a small amount of thermal paste to the center of the CPU (about the size of a pea or grain of rice). The pressure from the cooler will spread it evenly.",
-        image: "https://www.wikihow.com/images/thumb/9/90/Install-a-CPU-Cooler-in-an-AMD-Motherboard-Step-5-Version-3.jpg/v4-728px-Install-a-CPU-Cooler-in-an-AMD-Motherboard-Step-5-Version-3.jpg.webp",
+        image:
+          "https://www.wikihow.com/images/thumb/9/90/Install-a-CPU-Cooler-in-an-AMD-Motherboard-Step-5-Version-3.jpg/v4-728px-Install-a-CPU-Cooler-in-an-AMD-Motherboard-Step-5-Version-3.jpg.webp",
       },
       {
         title: "Install the CPU cooler",
         description:
           "Follow the manufacturer's instructions to install your CPU cooler. Make sure it's firmly attached and the fan is connected to the appropriate header on the motherboard.",
-        image: "https://www.wikihow.com/images/thumb/1/11/Install-a-CPU-Cooler-in-an-AMD-Motherboard-Step-6-Version-3.jpg/v4-728px-Install-a-CPU-Cooler-in-an-AMD-Motherboard-Step-6-Version-3.jpg.webp",
+        image:
+          "https://www.wikihow.com/images/thumb/1/11/Install-a-CPU-Cooler-in-an-AMD-Motherboard-Step-6-Version-3.jpg/v4-728px-Install-a-CPU-Cooler-in-an-AMD-Motherboard-Step-6-Version-3.jpg.webp",
       },
     ],
     tips: [

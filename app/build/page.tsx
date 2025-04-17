@@ -72,6 +72,8 @@ export default function BuildPage() {
   const [totalUltraTech, setTotalUltraTech] = useState(0)
   const [totalPotakaIT, setTotalPotakaIT] = useState(0)
   const [totalPCHouse, setTotalPCHouse] = useState(0)
+  // Add a new state variable for Skyland total:
+  const [totalSkyland, setTotalSkyland] = useState(0)
   const [selectedComponents, setSelectedComponents] = useState<Record<string, PCComponent | null>>({})
   const [crossSitePrices, setCrossSitePrices] = useState<Record<string, CrossSitePrices>>({})
   const [loading, setLoading] = useState(true)
@@ -116,6 +118,7 @@ export default function BuildPage() {
     let ultratechTotal = 0
     let potakaitTotal = 0
     let pchouseTotal = 0
+    let skylandTotal = 0 // Add this line
 
     // Calculate base total from selected components only
     Object.entries(selectedComponents).forEach(([type, component]) => {
@@ -139,6 +142,8 @@ export default function BuildPage() {
               potakaitTotal += priceValue
             } else if (component.source === "PC House") {
               pchouseTotal += priceValue
+            } else if (component.source === "Skyland") {
+              skylandTotal += priceValue
             }
           }
         }
@@ -155,6 +160,7 @@ export default function BuildPage() {
       UltraTech: new Set<string>(),
       "Potaka IT": new Set<string>(),
       "PC House": new Set<string>(),
+      Skyland: new Set<string>(), // Add this line
     }
 
     // First, add all selected components to their respective retailer totals and mark them as counted
@@ -167,7 +173,8 @@ export default function BuildPage() {
             source === "Techland" ||
             source === "UltraTech" ||
             source === "Potaka IT" ||
-            source === "PC House")
+            source === "PC House" ||
+            source === "Skyland")
         ) {
           countedTypes[source].add(type)
         }
@@ -200,6 +207,9 @@ export default function BuildPage() {
               } else if (retailer === "PC House") {
                 pchouseTotal += priceValue
                 countedTypes["PC House"].add(type)
+              } else if (retailer === "Skyland") {
+                skylandTotal += priceValue
+                countedTypes.Skyland.add(type)
               }
             }
           }
@@ -213,6 +223,7 @@ export default function BuildPage() {
     setTotalUltraTech(ultratechTotal)
     setTotalPotakaIT(potakaitTotal)
     setTotalPCHouse(pchouseTotal)
+    setTotalSkyland(skylandTotal)
   }, [selectedComponents, crossSitePrices])
 
   // Function to fetch cross-site prices for a component
@@ -285,7 +296,8 @@ export default function BuildPage() {
         source !== "Techland" &&
         source !== "UltraTech" &&
         source !== "Potaka IT" &&
-        source !== "PC House")
+        source !== "PC House" &&
+        source !== "Skyland")
     ) {
       return "N/A"
     }
@@ -407,6 +419,14 @@ export default function BuildPage() {
                       PC
                     </div>
                     <span>PC House</span>
+                  </div>
+                </th>
+                <th className="p-3 text-left font-medium text-sm">
+                  <div className="flex items-center">
+                    <div className="h-6 w-6 rounded-full bg-teal-900 flex items-center justify-center text-white text-xs mr-2 shadow-sm">
+                      SK
+                    </div>
+                    <span>Skyland</span>
                   </div>
                 </th>
               </tr>
@@ -756,6 +776,57 @@ export default function BuildPage() {
                       <span className="text-muted-foreground text-sm">N/A</span>
                     )}
                   </td>
+                  <td className="p-3">
+                    {loading ? (
+                      <Skeleton className="h-5 w-16" />
+                    ) : selectedComponents[category.id]?.source === "Skyland" ? (
+                      <div className="flex flex-col space-y-2">
+                        <div className="font-medium text-sm">
+                          {renderPrice(selectedComponents[category.id]?.price || "", "Skyland")}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <div className="px-1.5 py-0.5 bg-primary/10 text-xs rounded text-primary">Selected</div>
+                          <a href={selectedComponents[category.id]?.url} target="_blank" rel="noopener noreferrer">
+                            <Button variant="ghost" size="sm" className="h-6 px-2 text-xs">
+                              <ExternalLink className="h-3 w-3 mr-1" />
+                              View
+                            </Button>
+                          </a>
+                        </div>
+                      </div>
+                    ) : crossSitePrices[category.id]?.["Skyland"] ? (
+                      <div className="flex flex-col space-y-2">
+                        <div className="font-medium text-sm">
+                          {renderPrice(crossSitePrices[category.id]?.["Skyland"]?.price || "", "Skyland")}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-6 px-2 text-xs text-primary border-primary/30 hover:bg-primary/5 hover:text-primary hover:border-primary"
+                            onClick={() =>
+                              selectCrossSiteComponent(category.id, crossSitePrices[category.id]?.["Skyland"]!)
+                            }
+                          >
+                            <Check className="h-3 w-3 mr-1" />
+                            Select
+                          </Button>
+                          <a
+                            href={crossSitePrices[category.id]?.["Skyland"]?.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            <Button variant="ghost" size="sm" className="h-6 px-2 text-xs">
+                              <ExternalLink className="h-3 w-3 mr-1" />
+                              View
+                            </Button>
+                          </a>
+                        </div>
+                      </div>
+                    ) : (
+                      <span className="text-muted-foreground text-sm">N/A</span>
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -814,6 +885,15 @@ export default function BuildPage() {
                     <Skeleton className="h-7 w-24" />
                   ) : totalPCHouse > 0 ? (
                     <div className="font-bold text-lg text-primary">৳ {totalPCHouse.toLocaleString()}</div>
+                  ) : (
+                    <span className="text-muted-foreground">N/A</span>
+                  )}
+                </td>
+                <td className="p-3">
+                  {loading ? (
+                    <Skeleton className="h-7 w-24" />
+                  ) : totalSkyland > 0 ? (
+                    <div className="font-bold text-lg text-primary">৳ {totalSkyland.toLocaleString()}</div>
                   ) : (
                     <span className="text-muted-foreground">N/A</span>
                   )}

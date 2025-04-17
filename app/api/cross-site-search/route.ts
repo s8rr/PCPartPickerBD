@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
     const simplifiedQuery = simplifySearchTerm(query)
 
     // Fetch products from all sources except the excluded one
-    const sources = ["Startech", "Techland", "UltraTech", "Potaka IT", "PC House"]
+    const sources = ["Startech", "Techland", "UltraTech", "Potaka IT", "PC House", "Skyland"]
     const fetchPromises = sources
       .filter((source) => source !== excludeSource)
       .map((source) => {
@@ -42,6 +42,8 @@ export async function GET(request: NextRequest) {
               return fetchPotakaitProducts(simplifiedQuery)
             case "PC House":
               return fetchPCHouseProducts(simplifiedQuery)
+            case "Skyland":
+              return fetchSkylandProducts(simplifiedQuery)
             default:
               return Promise.resolve([])
           }
@@ -368,6 +370,47 @@ async function fetchPCHouseProducts(query: string): Promise<Product[]> {
     return products
   } catch (error) {
     console.error("Error fetching from PC House:", error)
+    return []
+  }
+}
+
+async function fetchSkylandProducts(query: string): Promise<Product[]> {
+  const products: Product[] = []
+  const url = `https://www.skyland.com.bd/index.php?route=product/search&search=${encodeURIComponent(query)}`
+
+  try {
+    const response = await fetch(url, {
+      next: { revalidate: 3600 },
+      signal: AbortSignal.timeout(10000), // 10 second timeout
+    })
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! Status: ${response.status}`)
+    }
+
+    const html = await response.text()
+    const $ = cheerio.load(html)
+
+    $(".product-layout").each((_, element) => {
+      const name = $(element).find(".name a").text().trim()
+      const price = $(element).find(".price").text().trim().replace(/\s+/g, " ")
+      const image = $(element).find(".image img").attr("src") || ""
+      const productUrl = $(element).find(".name a").attr("href") || ""
+      const availability = $(element).find(".stock").text().includes("In Stock") ? "In Stock" : "Out of Stock"
+
+      products.push({
+        name,
+        price,
+        image,
+        availability,
+        source: "Skyland",
+        url: productUrl,
+      })
+    })
+
+    return products
+  } catch (error) {
+    console.error("Error fetching from Skyland:", error)
     return []
   }
 }

@@ -127,9 +127,31 @@ export default function ComparePage() {
                     <TableCell>
                       <div className="flex items-center gap-2">
                         <div
-                          className={`h-8 w-8 rounded ${product.source === "Startech" ? "bg-blue-900" : "bg-gray-900"} flex items-center justify-center text-white text-xs`}
+                          className={`h-8 w-8 rounded ${
+                            product.source === "Startech"
+                              ? "bg-blue-900"
+                              : product.source === "Techland"
+                                ? "bg-gray-900"
+                                : product.source === "UltraTech"
+                                  ? "bg-purple-900"
+                                  : product.source === "Potaka IT"
+                                    ? "bg-green-900"
+                                    : product.source === "Skyland"
+                                      ? "bg-teal-900"
+                                      : "bg-red-900"
+                          } flex items-center justify-center text-white text-xs`}
                         >
-                          {product.source === "Startech" ? "ST" : "TL"}
+                          {product.source === "Startech"
+                            ? "ST"
+                            : product.source === "Techland"
+                              ? "TL"
+                              : product.source === "UltraTech"
+                                ? "UT"
+                                : product.source === "Potaka IT"
+                                  ? "PI"
+                                  : product.source === "Skyland"
+                                    ? "SK"
+                                    : "PC"}
                         </div>
                         {product.source}
                       </div>

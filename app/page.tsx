@@ -99,6 +99,7 @@ export default function Home() {
   const ultratechProducts = products.filter((product) => product.source === "UltraTech")
   const potakaitProducts = products.filter((product) => product.source === "Potaka IT")
   const pchouseProducts = products.filter((product) => product.source === "PC House")
+  const skylandProducts = products.filter((product) => product.source === "Skyland")
 
   // Product card skeleton for loading state
   const ProductCardSkeleton = () => (
@@ -324,6 +325,24 @@ export default function Home() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
                   {pchouseProducts.map((product, index) => (
                     <ProductCard key={`pchouse-${index}`} product={product} addToCompare={addToCompare} />
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Skyland Products */}
+            {skylandProducts.length > 0 && (
+              <div className="bg-card rounded-lg p-6 shadow-sm">
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="bg-teal-900 p-2 rounded-md flex items-center justify-center h-10 w-10">
+                    <span className="text-white font-bold">SK</span>
+                  </div>
+                  <h2 className="text-2xl font-semibold">Skyland</h2>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
+                  {skylandProducts.map((product, index) => (
+                    <ProductCard key={`skyland-${index}`} product={product} addToCompare={addToCompare} />
                   ))}
                 </div>
               </div>

@@ -27,6 +27,7 @@ export async function GET(request: NextRequest) {
     const ultratechProducts = await fetchUltratechProducts(query)
     const potakaitProducts = await fetchPotakaitProducts(query)
     const pchouseProducts = await fetchPCHouseProducts(query)
+    const skylandProducts = await fetchSkylandProducts(query)
 
     // Combine results
     const products = [
@@ -35,6 +36,7 @@ export async function GET(request: NextRequest) {
       ...ultratechProducts,
       ...potakaitProducts,
       ...pchouseProducts,
+      ...skylandProducts,
     ]
 
     return NextResponse.json({ products })
@@ -589,6 +591,89 @@ async function fetchPCHouseProducts(query: string): Promise<Product[]> {
   } catch (error) {
     console.error("Error fetching from PC House:", error)
     // Return an empty array instead of throwing an error
+    return []
+  }
+}
+
+async function fetchSkylandProducts(query: string): Promise<Product[]> {
+  const products: Product[] = []
+  const url = `https://www.skyland.com.bd/index.php?route=product/search&search=${encodeURIComponent(query)}`
+
+  try {
+    // Add timeout to prevent hanging requests
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 15000) // 15 second timeout
+
+    const response = await fetch(url, {
+      next: { revalidate: 3600 },
+      signal: controller.signal,
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+        Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.5",
+        Connection: "keep-alive",
+        "Upgrade-Insecure-Requests": "1",
+        "Cache-Control": "max-age=0",
+      },
+    }).catch((error) => {
+      console.error(`Error fetching from Skyland: ${error.message}`)
+      return null
+    })
+
+    clearTimeout(timeoutId)
+
+    if (!response || !response.ok) {
+      console.warn(`Failed to fetch from Skyland: ${response?.status || "No response"}`)
+      return []
+    }
+
+    const html = await response.text()
+    const $ = cheerio.load(html)
+
+    // Process only the first 20 items to avoid timeouts
+    const maxItems = 20
+    let itemCount = 0
+
+    // Skyland uses a similar structure to other OpenCart-based sites
+    $(".product-layout")
+      .slice(0, maxItems)
+      .each((_, element) => {
+        if (itemCount >= maxItems) return
+        itemCount++
+
+        const name = $(element).find(".name a").text().trim()
+
+        // Get both regular and special prices if available
+        let price = $(element).find(".price").text().trim().replace(/\s+/g, " ")
+        const oldPrice = $(element).find(".price-old").text().trim()
+        const newPrice = $(element).find(".price-new").text().trim()
+
+        // If both old and new prices exist, combine them
+        if (oldPrice && newPrice) {
+          price = `${newPrice} ${oldPrice}`
+        }
+
+        const image = $(element).find(".image img").attr("src") || ""
+        const productUrl = $(element).find(".name a").attr("href") || ""
+
+        // Check availability text
+        const availabilityText = $(element).find(".stock").text().trim()
+        const availability = availabilityText.toLowerCase().includes("in stock") ? "In Stock" : "Out of Stock"
+
+        products.push({
+          name,
+          price,
+          image,
+          availability,
+          source: "Skyland",
+          url: productUrl,
+        })
+      })
+
+    return products
+  } catch (error) {
+    console.error("Error fetching from Skyland:", error)
     return []
   }
 }
