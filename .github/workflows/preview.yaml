@@ -1,0 +1,21 @@
+name: GitHub Actions Vercel Preview Deployment
+env:
+  VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+  VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+
+on:
+  pull_request:
+
+jobs:
+  Deploy-Preview:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: amondnet/vercel-action@v25.2.0
+        with:
+         vercel-token: ${{ secrets.VERCEL_TOKEN }}
+         vercel-org-id: ${{ secrets.VERCEL_ORG_ID}}
+         vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID}}
+         github-comment: 'true'
+         github-token: ${{ secrets.GITHUB_TOKEN }}
+         scope: ${{ secrets.VERCEL_ORG_ID}}
