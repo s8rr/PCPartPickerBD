@@ -13,6 +13,8 @@ const navItems = [
   { name: "Home", href: "/" },
   { name: "Build", href: "/build" },
   { name: "Guides", href: "/guides" },
+  // { name: "Bug Report", href: "/bug-report" },
+  // { name: "Suggestions", href: "/suggestions" },
 ]
 
 export function SiteHeader() {
@@ -46,6 +48,24 @@ export function SiteHeader() {
                     {item.name}
                   </Link>
                 ))}
+                <Link
+                  href="/suggestions"
+                  className={cn(
+                    "text-sm font-medium transition-colors hover:text-primary px-2 py-1.5 rounded-md",
+                    pathname === "/suggestions" ? "bg-muted text-foreground" : "text-muted-foreground",
+                  )}
+                >
+                  Suggestions
+                </Link>
+                <Link
+                  href="/bug-report"
+                  className={cn(
+                    "text-sm font-medium transition-colors hover:text-primary px-2 py-1.5 rounded-md",
+                    pathname === "/bug-report" ? "bg-muted text-foreground" : "text-muted-foreground",
+                  )}
+                >
+                  Report a Bug
+                </Link>
               </div>
             </SheetContent>
           </Sheet>
@@ -65,6 +85,24 @@ export function SiteHeader() {
               {item.name}
             </Link>
           ))}
+          <Link
+            href="/suggestions"
+            className={cn(
+              "flex items-center text-sm font-medium transition-colors hover:text-primary",
+              pathname === "/suggestions" ? "text-primary" : "text-muted-foreground",
+            )}
+          >
+            Suggestions
+          </Link>
+          <Link
+            href="/bug-report"
+            className={cn(
+              "flex items-center text-sm font-medium transition-colors hover:text-primary",
+              pathname === "/bug-report" ? "text-primary" : "text-muted-foreground",
+            )}
+          >
+            Report a Bug
+          </Link>
         </nav>
 
         <div className="flex items-center gap-4">

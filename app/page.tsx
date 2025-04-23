@@ -21,6 +21,11 @@ import {
   ChevronLeft,
   ChevronRight,
   Loader2,
+  Check,
+  Layers,
+  MemoryStickIcon,
+  Zap,
+  Box,
 } from "lucide-react"
 import { SiteHeader } from "@/components/site-header"
 import { AttentionBanner } from "@/components/attention-banner"
@@ -45,6 +50,8 @@ export default function Home() {
   const [hasMore, setHasMore] = useState(false)
   const [productsPerPage] = useState(20) // Number of products to show per retailer
   const router = useRouter()
+  // Add a new state variable to track whether search results are being displayed
+  const [showHeroText, setShowHeroText] = useState(true)
 
   // Load compare list from localStorage on component mount
   const initialQueryProcessed = React.useRef(false)
@@ -77,6 +84,7 @@ export default function Home() {
     localStorage.setItem("compareList", JSON.stringify(compareList))
   }, [compareList])
 
+  // Modify the searchProducts function to update the showHeroText state
   const searchProducts = async (resetPage = true, searchQuery = query) => {
     if (!searchQuery.trim()) return
 
@@ -86,6 +94,8 @@ export default function Home() {
 
     setLoading(true)
     setError("")
+    // Hide the hero text when searching
+    setShowHeroText(false)
 
     try {
       const response = await fetch(`/api/products?query=${encodeURIComponent(searchQuery)}&limit=${productsPerPage}`)
@@ -169,22 +179,28 @@ export default function Home() {
       {/* Hero section with search */}
       <div className="bg-gradient-to-b from-background to-muted/50 border-b">
         <div className="container mx-auto py-8 md:py-16 px-4 text-center">
-          <h1 className="text-2xl md:text-3xl font-bold mb-3">Your Personal PC Parts Comparison Tool</h1>
-          <p className="text-muted-foreground max-w-2xl mx-auto mb-6 md:mb-8 text-sm md:text-base">
-            Welcome to PCPartPickerBD, where we help you find the best deals across Bangladesh's top tech retailers.
-            Compare prices on CPUs, GPUs, monitors, and more to build your perfect PC within your budget.
-          </p>
+          {showHeroText && products.length === 0 && (
+            <>
+              <h1 className="text-2xl md:text-3xl font-bold mb-3">PC Parts Price Comparison Tool in Bangladesh</h1>
+              <p className="text-muted-foreground max-w-2xl mx-auto mb-6 md:mb-8 text-sm md:text-base">
+                Welcome to PCPartPickerBD, where we help you find the best deals across Bangladesh's top tech retailers
+                like Startech, Techland, UltraTech, and more. Compare prices on Ryzen CPUs, RTX GPUs, gaming monitors,
+                and all PC components to build your perfect PC within your budget.
+              </p>
+            </>
+          )}
 
           <div className="flex gap-2 mb-8 max-w-xl mx-auto">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 type="text"
-                placeholder="Search for products..."
+                placeholder="Search for PC parts in Bangladesh..."
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && searchProducts()}
                 className="pl-10"
+                aria-label="Search for PC parts"
               />
             </div>
             <Button onClick={() => searchProducts()} disabled={loading} className="min-w-[100px]">
@@ -266,7 +282,7 @@ export default function Home() {
                   <div className="bg-blue-900 p-2 rounded-md flex items-center justify-center h-8 w-8 md:h-10 md:w-10">
                     <span className="text-white font-bold">ST</span>
                   </div>
-                  <h2 className="text-xl md:text-2xl font-semibold">StarTech</h2>
+                  <h2 className="text-xl md:text-2xl font-semibold">StarTech Bangladesh</h2>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 md:gap-6">
@@ -284,7 +300,7 @@ export default function Home() {
                   <div className="bg-gray-900 p-2 rounded-md flex items-center justify-center h-8 w-8 md:h-10 md:w-10">
                     <span className="text-white font-bold">TL</span>
                   </div>
-                  <h2 className="text-xl md:text-2xl font-semibold">TechLand</h2>
+                  <h2 className="text-xl md:text-2xl font-semibold">TechLand Bangladesh</h2>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 md:gap-6">
@@ -302,7 +318,7 @@ export default function Home() {
                   <div className="bg-purple-900 p-2 rounded-md flex items-center justify-center h-8 w-8 md:h-10 md:w-10">
                     <span className="text-white font-bold">UT</span>
                   </div>
-                  <h2 className="text-xl md:text-2xl font-semibold">UltraTech</h2>
+                  <h2 className="text-xl md:text-2xl font-semibold">UltraTech Bangladesh</h2>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 md:gap-6">
@@ -320,7 +336,7 @@ export default function Home() {
                   <div className="bg-green-900 p-2 rounded-md flex items-center justify-center h-8 w-8 md:h-10 md:w-10">
                     <span className="text-white font-bold">PI</span>
                   </div>
-                  <h2 className="text-xl md:text-2xl font-semibold">Potaka IT</h2>
+                  <h2 className="text-xl md:text-2xl font-semibold">Potaka IT Bangladesh</h2>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 md:gap-6">
@@ -338,7 +354,7 @@ export default function Home() {
                   <div className="bg-red-900 p-2 rounded-md flex items-center justify-center h-8 w-8 md:h-10 md:w-10">
                     <span className="text-white font-bold">PC</span>
                   </div>
-                  <h2 className="text-xl md:text-2xl font-semibold">PC House</h2>
+                  <h2 className="text-xl md:text-2xl font-semibold">PC House Bangladesh</h2>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 md:gap-6">
@@ -356,7 +372,7 @@ export default function Home() {
                   <div className="bg-teal-900 p-2 rounded-md flex items-center justify-center h-8 w-8 md:h-10 md:w-10">
                     <span className="text-white font-bold">SK</span>
                   </div>
-                  <h2 className="text-xl md:text-2xl font-semibold">Skyland</h2>
+                  <h2 className="text-xl md:text-2xl font-semibold">Skyland Bangladesh</h2>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 md:gap-6">
@@ -405,9 +421,9 @@ export default function Home() {
               <div className="bg-muted rounded-full p-4 inline-flex mb-4">
                 <Search className="h-6 w-6 md:h-8 md:w-8 text-muted-foreground" />
               </div>
-              <h2 className="text-xl md:text-2xl font-semibold mb-2">No products found</h2>
+              <h2 className="text-xl md:text-2xl font-semibold mb-2">Search for PC Parts in Bangladesh</h2>
               <p className="text-muted-foreground max-w-md mx-auto mb-6 md:mb-8 text-sm md:text-base">
-                Search for products to compare prices across different retailers.
+                Compare prices for CPUs, GPUs, motherboards, RAM, and more across all major Bangladeshi retailers.
               </p>
               <div className="flex flex-col sm:flex-row gap-4 justify-center">
                 <Button variant="outline" onClick={goToBuildPage} className="gap-2">
@@ -430,13 +446,15 @@ export default function Home() {
         {/* Quick links section - Updated with Lucide icons */}
         {!loading && products.length === 0 && (
           <div className="mt-8 md:mt-16 border-t pt-8 md:pt-12">
-            <h2 className="text-xl md:text-2xl font-semibold mb-4 md:mb-6 text-center">Popular Categories</h2>
+            <h2 className="text-xl md:text-2xl font-semibold mb-4 md:mb-6 text-center">
+              Popular PC Components in Bangladesh
+            </h2>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
               {[
-                { name: "CPUs", icon: Cpu, link: "/build/components/cpu" },
-                { name: "Graphics Cards", icon: Gpu, link: "/build/components/video-card" },
-                { name: "Monitors", icon: MonitorIcon, link: "/build/components/monitor" },
-                { name: "Storage", icon: HardDrive, link: "/build/components/storage" },
+                { name: "Ryzen & Intel CPUs", icon: Cpu, link: "/build/components/cpu" },
+                { name: "RTX & AMD GPUs", icon: Gpu, link: "/build/components/video-card" },
+                { name: "Gaming Monitors", icon: MonitorIcon, link: "/build/components/monitor" },
+                { name: "SSDs & HDDs", icon: HardDrive, link: "/build/components/storage" },
               ].map((category) => (
                 <Link href={category.link} key={category.name}>
                   <div className="border rounded-lg p-4 md:p-6 text-center hover:border-primary hover:bg-primary/5 transition-colors">
@@ -454,49 +472,177 @@ export default function Home() {
             </div>
           </div>
         )}
+
+        {/* SEO-optimized content section with beautified design */}
+        {!loading && products.length === 0 && (
+          <div className="mt-12 border-t pt-8">
+            <div className="bg-gradient-to-r from-primary/5 to-primary/10 rounded-xl p-8 shadow-sm">
+              <div className="max-w-4xl mx-auto">
+                <h2 className="text-2xl font-bold mb-6 text-center bg-clip-text text-transparent bg-gradient-to-r from-primary to-primary/70">
+                  Find the Best PC Parts in Bangladesh
+                </h2>
+
+                <div className="grid md:grid-cols-2 gap-8">
+                  <div className="space-y-4">
+                    <p className="text-sm md:text-base">
+                      PCPartPickerBD helps you compare prices for computer components across all major retailers in
+                      Bangladesh including Startech, Techland, UltraTech, Potaka IT, PC House, and Skyland. Whether
+                      you're building a gaming PC, a workstation, or upgrading your existing computer, we make it easy
+                      to find the best deals on PC parts in Bangladesh.
+                    </p>
+
+                    <h3 className="text-lg font-medium mt-6 mb-2">Why Use PCPartPickerBD?</h3>
+                    <ul className="list-none space-y-2">
+                      {[
+                        "Compare prices from all major Bangladeshi PC component retailers in one place",
+                        "Build a complete PC with our PC Builder tool and see the total cost",
+                        "Find the best deals on Ryzen CPUs, RTX GPUs, gaming monitors, and more",
+                        "Check real-time stock availability before visiting stores",
+                        "Share your PC build with friends and get feedback",
+                      ].map((item, index) => (
+                        <li key={index} className="flex items-start gap-2">
+                          <div className="rounded-full bg-primary/20 p-1 mt-0.5">
+                            <Check className="h-3 w-3 text-primary" />
+                          </div>
+                          <span className="text-sm">{item}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+
+                  <div>
+                    <h3 className="text-lg font-medium mb-4">Popular PC Components in Bangladesh</h3>
+                    <div className="bg-card rounded-lg p-4 shadow-inner">
+                      <p className="text-sm mb-3">
+                        Looking for the latest AMD Ryzen processors, NVIDIA RTX graphics cards, or high-refresh gaming
+                        monitors? PCPartPickerBD helps you find the best prices on all PC components in Bangladesh,
+                        including:
+                      </p>
+                      <div className="grid grid-cols-2 gap-2 text-sm">
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2">
+                            <Cpu className="h-4 w-4 text-primary" />
+                            <span>AMD Ryzen & Intel Core CPUs</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Gpu className="h-4 w-4 text-primary" />
+                            <span>NVIDIA RTX & AMD RX GPUs</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Layers className="h-4 w-4 text-primary" />
+                            <span>MSI, ASUS, Gigabyte Motherboards</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <MemoryStickIcon className="h-4 w-4 text-primary" />
+                            <span>Corsair, G.Skill, Kingston RAM</span>
+                          </div>
+                        </div>
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2">
+                            <HardDrive className="h-4 w-4 text-primary" />
+                            <span>Samsung, WD, Crucial Storage</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Zap className="h-4 w-4 text-primary" />
+                            <span>Corsair, EVGA, Cooler Master PSUs</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Box className="h-4 w-4 text-primary" />
+                            <span>NZXT, Phanteks, Lian Li Cases</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <MonitorIcon className="h-4 w-4 text-primary" />
+                            <span>LG, Samsung, ASUS Monitors</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* Footer - Updated copyright year */}
+      {/* Footer - Updated with developer attribution */}
       <footer className="border-t bg-muted/50">
         <div className="container mx-auto py-6 md:py-8 px-4">
-          <div className="flex flex-col md:flex-row justify-between items-start">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             <div>
-              <p className="text-xs md:text-sm text-muted-foreground mb-3 md:mb-4">
-                © 2025 PCPartPickerBD. All rights reserved.
+              <h3 className="font-semibold mb-4">PCPartPickerBD</h3>
+              <p className="text-xs md:text-sm text-muted-foreground mb-3">
+                The #1 PC parts price comparison tool in Bangladesh. Find the best deals on computer components from all
+                major retailers.
               </p>
-              <div className="flex gap-4">
+              <p className="text-xs md:text-sm text-muted-foreground">© 2025 PCPartPickerBD. All rights reserved.</p>
+            </div>
+
+            <div>
+              <h3 className="font-semibold mb-4">Quick Links</h3>
+              <div className="grid grid-cols-2 gap-2">
                 <Link href="/build" className="text-xs md:text-sm text-muted-foreground hover:text-foreground">
                   PC Builder
                 </Link>
                 <Link href="/compare" className="text-xs md:text-sm text-muted-foreground hover:text-foreground">
                   Compare Products
                 </Link>
+                <Link href="/guides" className="text-xs md:text-sm text-muted-foreground hover:text-foreground">
+                  PC Building Guides
+                </Link>
+                <Link href="/search" className="text-xs md:text-sm text-muted-foreground hover:text-foreground">
+                  Search PC Parts
+                </Link>
+                <Link
+                  href="/build/components/cpu"
+                  className="text-xs md:text-sm text-muted-foreground hover:text-foreground"
+                >
+                  CPUs
+                </Link>
+                <Link
+                  href="/build/components/video-card"
+                  className="text-xs md:text-sm text-muted-foreground hover:text-foreground"
+                >
+                  Graphics Cards
+                </Link>
               </div>
             </div>
 
-            <div className="mt-4 md:mt-0 flex flex-col items-start md:items-end">
-              <div className="text-xs md:text-sm text-muted-foreground">
-                Developed by{" "}
-                <a
-                  href="https://sabbir.lol"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-primary hover:underline"
-                >
-                  Sabbir
-                </a>
+            <div>
+              <h3 className="font-semibold mb-4">Popular Retailers</h3>
+              <div className="grid grid-cols-2 gap-2">
+                <span className="text-xs md:text-sm text-muted-foreground">Startech Bangladesh</span>
+                <span className="text-xs md:text-sm text-muted-foreground">Techland BD</span>
+                <span className="text-xs md:text-sm text-muted-foreground">UltraTech</span>
+                <span className="text-xs md:text-sm text-muted-foreground">Potaka IT</span>
+                <span className="text-xs md:text-sm text-muted-foreground">PC House BD</span>
+                <span className="text-xs md:text-sm text-muted-foreground">Skyland Bangladesh</span>
               </div>
-              <div className="text-xs md:text-sm text-muted-foreground mt-1">
-                Supported by{" "}
-                <a
-                  href="https://unknownport.com"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-primary hover:underline"
-                >
-                  unknownport.com
-                </a>
-              </div>
+            </div>
+          </div>
+
+          <div className="mt-8 pt-6 border-t flex flex-col md:flex-row justify-between items-center">
+            <div className="text-xs md:text-sm text-muted-foreground mb-3 md:mb-0">
+              Developed by{" "}
+              <a
+                href="https://sabbir.lol"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-primary hover:underline"
+              >
+                Sabbir
+              </a>
+            </div>
+            <div className="text-xs md:text-sm text-muted-foreground">
+              Supported by{" "}
+              <a
+                href="https://unknownport.com"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-primary hover:underline"
+              >
+                unknownport.com
+              </a>
             </div>
           </div>
         </div>
@@ -549,7 +695,7 @@ function ProductCard({ product, addToCompare }: ProductCardProps) {
           {product.image ? (
             <Image
               src={product.image || "/placeholder.svg"}
-              alt={product.name}
+              alt={`${product.name} - PC part in Bangladesh`}
               fill
               className="object-contain p-2 transition-transform duration-300 group-hover:scale-105"
             />
