@@ -12,6 +12,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
+      - name: Debug Env
+        run: echo "Token is: ${{ secrets.VERCEL_TOKEN != '' }}"
 
       - name: Deploy to Vercel Preview
         uses: amondnet/vercel-action@v25.2.0
