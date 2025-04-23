@@ -4,8 +4,8 @@ A Bangladeshi PC part price comparison and builder web application.
 
 This project allows users to compare prices from different tech retailers in Bangladesh and build custom PC configurations.
 
-- Live: [pcpartpicker.sabbir.lol](https://pcpartpicker.sabbir.lol)
-- API docs: https://partpicker.sabbir.lol/
+- Live: https://www.pcpartpickerbd.com/
+- API docs: https://api.pcpartpickerbd.com/
 ## Features
 
 - Compare prices of PC components from various Bangladeshi retail websites
