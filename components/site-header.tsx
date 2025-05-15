@@ -72,7 +72,7 @@ export function SiteHeader() {
           <Logo />
         </div>
 
-        <nav className="hidden md:flex gap-6">
+        <nav className="hidden md:flex gap-6" aria-label="Main Navigation">
           {navItems.map((item) => (
             <Link
               key={item.href}
@@ -81,6 +81,7 @@ export function SiteHeader() {
                 "text-sm font-medium transition-colors hover:text-primary",
                 pathname === item.href ? "text-foreground" : "text-muted-foreground",
               )}
+              aria-current={pathname === item.href ? "page" : undefined}
             >
               {item.name}
             </Link>
@@ -91,6 +92,7 @@ export function SiteHeader() {
               "flex items-center text-sm font-medium transition-colors hover:text-primary",
               pathname === "/suggestions" ? "text-primary" : "text-muted-foreground",
             )}
+            aria-current={pathname === "/suggestions" ? "page" : undefined}
           >
             Suggestions
           </Link>
@@ -100,6 +102,7 @@ export function SiteHeader() {
               "flex items-center text-sm font-medium transition-colors hover:text-primary",
               pathname === "/bug-report" ? "text-primary" : "text-muted-foreground",
             )}
+            aria-current={pathname === "/bug-report" ? "page" : undefined}
           >
             Report a Bug
           </Link>

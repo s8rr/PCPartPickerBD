@@ -29,6 +29,8 @@ import {
 } from "lucide-react"
 import { SiteHeader } from "@/components/site-header"
 import { AttentionBanner } from "@/components/attention-banner"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Breadcrumbs } from "@/components/breadcrumbs"
 
 interface Product {
   name: string
@@ -52,7 +54,9 @@ export default function Home() {
   const router = useRouter()
   // Add a new state variable to track whether search results are being displayed
   const [showHeroText, setShowHeroText] = useState(true)
-
+  const [sortOption, setSortOption] = useState<string>("relevance")
+  // Use products directly without filtering
+  const filteredProducts = products
   // Load compare list from localStorage on component mount
   const initialQueryProcessed = React.useRef(false)
 
@@ -84,6 +88,57 @@ export default function Home() {
     localStorage.setItem("compareList", JSON.stringify(compareList))
   }, [compareList])
 
+  const handleSort = (value: string) => {
+    setSortOption(value)
+
+    if (products.length === 0) return
+
+    // Create a copy of the products to sort
+    const sortedProducts = [...products]
+
+    switch (value) {
+      case "price-asc":
+        sortedProducts.sort((a, b) => {
+          const priceA = extractNumericPrice(a.price)
+          const priceB = extractNumericPrice(b.price)
+          return priceA - priceB
+        })
+        break
+      case "price-desc":
+        sortedProducts.sort((a, b) => {
+          const priceA = extractNumericPrice(a.price)
+          const priceB = extractNumericPrice(b.price)
+          return priceB - priceA
+        })
+        break
+      case "name-asc":
+        sortedProducts.sort((a, b) => a.name.localeCompare(b.name))
+        break
+      case "name-desc":
+        sortedProducts.sort((a, b) => b.name.localeCompare(a.name))
+        break
+      case "relevance":
+      default:
+        // Sort by availability (in stock first)
+        sortedProducts.sort((a, b) => {
+          if (a.availability === "In Stock" && b.availability !== "In Stock") return -1
+          if (a.availability !== "In Stock" && b.availability === "In Stock") return 1
+          return 0
+        })
+        break
+    }
+
+    // Update the products state with the sorted products
+    setProducts(sortedProducts)
+  }
+
+  const extractNumericPrice = (price: string): number => {
+    // Extract numeric value from price string (e.g., "৳ 12,500" -> 12500)
+    const matches = price.match(/[\d,]+/)
+    if (!matches) return 0
+    return Number.parseFloat(matches[0].replace(/,/g, ""))
+  }
+
   // Modify the searchProducts function to update the showHeroText state
   const searchProducts = async (resetPage = true, searchQuery = query) => {
     if (!searchQuery.trim()) return
@@ -105,7 +160,38 @@ export default function Home() {
       }
 
       const data = await response.json()
-      setProducts(data.products)
+
+      // Apply the current sort option if not relevance
+      if (sortOption !== "relevance" && data.products.length > 0) {
+        const sortedProducts = [...data.products]
+
+        switch (sortOption) {
+          case "price-asc":
+            sortedProducts.sort((a, b) => {
+              const priceA = extractNumericPrice(a.price)
+              const priceB = extractNumericPrice(b.price)
+              return priceA - priceB
+            })
+            break
+          case "price-desc":
+            sortedProducts.sort((a, b) => {
+              const priceA = extractNumericPrice(a.price)
+              const priceB = extractNumericPrice(b.price)
+              return priceB - priceA
+            })
+            break
+          case "name-asc":
+            sortedProducts.sort((a, b) => a.name.localeCompare(b.name))
+            break
+          case "name-desc":
+            sortedProducts.sort((a, b) => b.name.localeCompare(a.name))
+            break
+        }
+
+        setProducts(sortedProducts)
+      } else {
+        setProducts(data.products)
+      }
 
       // Set hasMore based on whether we got a full page of results
       setHasMore(data.products.length >= productsPerPage * 6) // 6 retailers
@@ -151,12 +237,12 @@ export default function Home() {
   }
 
   // Group products by source
-  const startechProducts = products.filter((product) => product.source === "Startech")
-  const techlandProducts = products.filter((product) => product.source === "Techland")
-  const ultratechProducts = products.filter((product) => product.source === "UltraTech")
-  const potakaitProducts = products.filter((product) => product.source === "Potaka IT")
-  const pchouseProducts = products.filter((product) => product.source === "PC House")
-  const skylandProducts = products.filter((product) => product.source === "Skyland")
+  const startechProducts = filteredProducts.filter((product) => product.source === "Startech")
+  const techlandProducts = filteredProducts.filter((product) => product.source === "Techland")
+  const ultratechProducts = filteredProducts.filter((product) => product.source === "UltraTech")
+  const potakaitProducts = filteredProducts.filter((product) => product.source === "Potaka IT")
+  const pchouseProducts = filteredProducts.filter((product) => product.source === "PC House")
+  const skylandProducts = filteredProducts.filter((product) => product.source === "Skyland")
 
   // Product card skeleton for loading state
   const ProductCardSkeleton = () => (
@@ -175,17 +261,19 @@ export default function Home() {
     <main className="min-h-screen">
       <AttentionBanner />
       <SiteHeader />
+      <Breadcrumbs />
 
       {/* Hero section with search */}
       <div className="bg-gradient-to-b from-background to-muted/50 border-b">
         <div className="container mx-auto py-8 md:py-16 px-4 text-center">
           {showHeroText && products.length === 0 && (
             <>
-              <h1 className="text-2xl md:text-3xl font-bold mb-3">PC Parts Price Comparison Tool in Bangladesh</h1>
-              <p className="text-muted-foreground max-w-2xl mx-auto mb-6 md:mb-8 text-sm md:text-base">
-                Welcome to PCPartPickerBD, where we help you find the best deals across Bangladesh's top tech retailers
-                like Startech, Techland, UltraTech, and more. Compare prices on Ryzen CPUs, RTX GPUs, gaming monitors,
-                and all PC components to build your perfect PC within your budget.
+              <h1 className="text-2xl md:text-3xl font-bold mb-3">
+                PCPartPickerBD - #1 PC Parts Price Comparison in Bangladesh
+              </h1>
+              <p className="text-muted-foreground max-w-xl mx-auto mb-6 md:mb-8 text-sm md:text-base">
+                Compare prices on PC components from Startech, Techland, UltraTech and more. Find the best deals on
+                CPUs, GPUs, and all PC parts in Bangladesh.
               </p>
             </>
           )}
@@ -273,8 +361,32 @@ export default function Home() {
               </div>
             </div>
           </div>
-        ) : products.length > 0 ? (
+        ) : filteredProducts.length > 0 ? (
           <div className="space-y-8 md:space-y-12">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4">
+              <p className="text-sm text-muted-foreground">
+                Found {products.length} {products.length === 1 ? "product" : "products"} for "{query}"
+              </p>
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 ml-4">
+                    <span className="text-sm text-muted-foreground hidden sm:inline">Sort by:</span>
+                    <Select value={sortOption} onValueChange={handleSort}>
+                      <SelectTrigger className="w-[140px] h-8 text-xs">
+                        <SelectValue placeholder="Sort by" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="relevance">Relevance</SelectItem>
+                        <SelectItem value="price-asc">Price: Low to High</SelectItem>
+                        <SelectItem value="price-desc">Price: High to Low</SelectItem>
+                        <SelectItem value="name-asc">Name: A to Z</SelectItem>
+                        <SelectItem value="name-desc">Name: Z to A</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </div>
+            </div>
             {/* StarTech Products */}
             {startechProducts.length > 0 && (
               <div className="bg-card rounded-lg p-4 md:p-6 shadow-sm">
@@ -479,19 +591,20 @@ export default function Home() {
             <div className="bg-gradient-to-r from-primary/5 to-primary/10 rounded-xl p-8 shadow-sm">
               <div className="max-w-4xl mx-auto">
                 <h2 className="text-2xl font-bold mb-6 text-center bg-clip-text text-transparent bg-gradient-to-r from-primary to-primary/70">
-                  Find the Best PC Parts in Bangladesh
+                  Find the Best PC Parts in Bangladesh at the Lowest Prices
                 </h2>
 
                 <div className="grid md:grid-cols-2 gap-8">
                   <div className="space-y-4">
                     <p className="text-sm md:text-base">
-                      PCPartPickerBD helps you compare prices for computer components across all major retailers in
-                      Bangladesh including Startech, Techland, UltraTech, Potaka IT, PC House, and Skyland. Whether
-                      you're building a gaming PC, a workstation, or upgrading your existing computer, we make it easy
-                      to find the best deals on PC parts in Bangladesh.
+                      PCPartPickerBD is Bangladesh's leading PC parts price comparison tool that helps you compare
+                      prices for computer components across all major retailers in Bangladesh including Startech,
+                      Techland, UltraTech, Ryans, Potaka IT, PC House, and Skyland. Whether you're building a gaming PC
+                      in Dhaka, a workstation in Chittagong, or upgrading your existing computer in Bangladesh, we make
+                      it easy to find the best deals on PC parts in Bangladesh.
                     </p>
 
-                    <h3 className="text-lg font-medium mt-6 mb-2">Why Use PCPartPickerBD?</h3>
+                    <h3 className="text-lg font-medium mt-6 mb-2">Why Use PCPartPickerBD in Bangladesh?</h3>
                     <ul className="list-none space-y-2">
                       {[
                         "Compare prices from all major Bangladeshi PC component retailers in one place",
@@ -572,8 +685,8 @@ export default function Home() {
             <div>
               <h3 className="font-semibold mb-4">PCPartPickerBD</h3>
               <p className="text-xs md:text-sm text-muted-foreground mb-3">
-                The #1 PC parts price comparison tool in Bangladesh. Find the best deals on computer components from all
-                major retailers.
+                PC parts price comparison tool in Bangladesh. Find the best deals on computer components from all major
+                retailers.
               </p>
               <p className="text-xs md:text-sm text-muted-foreground">© 2025 PCPartPickerBD. All rights reserved.</p>
             </div>

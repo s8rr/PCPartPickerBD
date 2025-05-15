@@ -10,6 +10,8 @@ import { Filter, Check, Search, Loader2, RefreshCw, ArrowLeft } from "lucide-rea
 import { Badge } from "@/components/ui/badge"
 import { SiteHeader } from "@/components/site-header"
 import { AttentionBanner } from "@/components/attention-banner"
+// Add the import for the Select component
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 interface Component {
   name: string
@@ -152,6 +154,10 @@ export default function ComponentSelectionPage() {
   const [selectedSource, setSelectedSource] = useState<string | null>(null)
   const [selectedAvailability, setSelectedAvailability] = useState<string | null>(null)
   const [availableSources, setAvailableSources] = useState<string[]>([])
+  // Add the state variable for sorting
+  const [sortOption, setSortOption] = useState<string>("relevance")
+  // Add a flag to track if initial data is loaded
+  const [initialDataLoaded, setInitialDataLoaded] = useState(false)
 
   // Initial data fetch
   useEffect(() => {
@@ -185,12 +191,15 @@ export default function ComponentSelectionPage() {
       const componentsData = data.components || []
       setComponents(componentsData)
 
+      // Set filtered components directly to all components initially
+      setFilteredComponents(componentsData)
+
       // Extract available sources for filters
       const sources = Array.from(new Set(componentsData.map((comp: Component) => comp.source)))
       setAvailableSources(sources)
 
-      // Apply any existing filters to the new data
-      applyFilters(componentsData)
+      // Mark initial data as loaded
+      setInitialDataLoaded(true)
     } catch (err) {
       console.error("Error fetching components:", err)
       setError(err instanceof Error ? err.message : "Failed to load components. Please try again later.")
@@ -200,6 +209,20 @@ export default function ComponentSelectionPage() {
       setSearching(false)
     }
   }
+
+  // Apply filters only after initial data is loaded and when filter selections change
+  useEffect(() => {
+    if (!initialDataLoaded) return
+
+    applyFilters(components)
+  }, [selectedSource, selectedAvailability, searchQuery, initialDataLoaded])
+
+  // Apply sorting when sort option changes, but only after initial data is loaded
+  useEffect(() => {
+    if (!initialDataLoaded || filteredComponents.length === 0) return
+
+    handleSort(sortOption)
+  }, [sortOption, initialDataLoaded])
 
   // Replace the applyFilters function with this enhanced version that prioritizes exact matches
   const applyFilters = (componentsToFilter: Component[]) => {
@@ -212,7 +235,13 @@ export default function ComponentSelectionPage() {
 
     // Apply availability filter
     if (selectedAvailability) {
-      result = result.filter((component) => component.availability === selectedAvailability)
+      if (selectedAvailability === "Decimal Price") {
+        // Filter for components with decimal prices
+        result = result.filter((component) => hasDecimalPrice(component.price))
+      } else {
+        // Regular availability filter
+        result = result.filter((component) => component.availability === selectedAvailability)
+      }
     }
 
     // If there's a search query, prioritize exact matches
@@ -280,10 +309,68 @@ export default function ComponentSelectionPage() {
     return [...exactMatches, ...startsWithMatches, ...containsMatches, ...otherMatches]
   }
 
-  // Apply filters when filter selections change
-  useEffect(() => {
-    applyFilters(components)
-  }, [selectedSource, selectedAvailability, components, searchQuery])
+  // Add the handleSort function after the other functions:
+  const handleSort = (value: string) => {
+    setSortOption(value)
+
+    // Create a copy of the filtered components to sort
+    const sortedComponents = [...filteredComponents]
+
+    switch (value) {
+      case "price-asc":
+        sortedComponents.sort((a, b) => {
+          const priceA = extractNumericPrice(a.price)
+          const priceB = extractNumericPrice(b.price)
+          return priceA - priceB
+        })
+        break
+      case "price-desc":
+        sortedComponents.sort((a, b) => {
+          const priceA = extractNumericPrice(a.price)
+          const priceB = extractNumericPrice(b.price)
+          return priceB - priceA
+        })
+        break
+      case "name-asc":
+        sortedComponents.sort((a, b) => a.name.localeCompare(b.name))
+        break
+      case "name-desc":
+        sortedComponents.sort((a, b) => b.name.localeCompare(a.name))
+        break
+      case "relevance":
+      default:
+        // If searching, maintain the search relevance order
+        if (searchQuery) {
+          // The components are already sorted by relevance from the search function
+          break
+        }
+        // Otherwise sort by availability (in stock first)
+        sortedComponents.sort((a, b) => {
+          if (a.availability === "In Stock" && b.availability !== "In Stock") return -1
+          if (a.availability !== "In Stock" && b.availability === "In Stock") return 1
+          return 0
+        })
+        break
+    }
+
+    setFilteredComponents(sortedComponents)
+  }
+
+  // Add the helper function to extract numeric price
+  const extractNumericPrice = (price: string): number => {
+    // Extract numeric value from price string (e.g., "৳ 12,500" -> 12500)
+    const matches = price.match(/[\d,]+/)
+    if (!matches) return 0
+    return Number.parseFloat(matches[0].replace(/,/g, ""))
+  }
+
+  // Add a function to check if a price is a decimal price (indicating in stock)
+  // Add this function after the extractNumericPrice function:
+
+  const hasDecimalPrice = (price: string): boolean => {
+    // Check if the price contains a decimal point or comma followed by digits
+    return /[\d]+[.,][\d]+/.test(price)
+  }
 
   // Handle search submission
   const handleSearch = () => {
@@ -337,7 +424,6 @@ export default function ComponentSelectionPage() {
     </div>
   )
 
-  // Replace the existing header code with:
   return (
     <div className="min-h-screen">
       <AttentionBanner />
@@ -485,14 +571,14 @@ export default function ComponentSelectionPage() {
                   {selectedAvailability === null && <Check className="ml-2 h-3 w-3" />}
                 </Button>
                 <Button
-                  variant={selectedAvailability === "In Stock" ? "default" : "outline"}
+                  variant={selectedAvailability === "Decimal Price" ? "default" : "outline"}
                   size="sm"
                   className="mr-2"
-                  onClick={() => setSelectedAvailability("In Stock")}
+                  onClick={() => setSelectedAvailability("Decimal Price")}
                   disabled={loading}
                 >
-                  In Stock
-                  {selectedAvailability === "In Stock" && <Check className="ml-2 h-3 w-3" />}
+                  With Price
+                  {selectedAvailability === "Decimal Price" && <Check className="ml-2 h-3 w-3" />}
                 </Button>
                 <Button
                   variant={selectedAvailability === "Out of Stock" ? "default" : "outline"}
@@ -561,11 +647,28 @@ export default function ComponentSelectionPage() {
                   <p className="text-sm text-muted-foreground">
                     Showing {filteredComponents.length} {filteredComponents.length === 1 ? "result" : "results"}
                   </p>
-                  {searchQuery && (
-                    <Badge variant="outline" className="flex items-center gap-1">
-                      Search: {searchQuery}
-                    </Badge>
-                  )}
+                  <div className="flex items-center gap-3">
+                    {searchQuery && (
+                      <Badge variant="outline" className="flex items-center gap-1">
+                        Search: {searchQuery}
+                      </Badge>
+                    )}
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-muted-foreground hidden sm:inline">Sort by:</span>
+                      <Select value={sortOption} onValueChange={(value) => handleSort(value)}>
+                        <SelectTrigger className="w-[140px] h-8 text-xs">
+                          <SelectValue placeholder="Sort by" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="relevance">Relevance</SelectItem>
+                          <SelectItem value="price-asc">Price: Low to High</SelectItem>
+                          <SelectItem value="price-desc">Price: High to Low</SelectItem>
+                          <SelectItem value="name-asc">Name: A to Z</SelectItem>
+                          <SelectItem value="name-desc">Name: Z to A</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
                 </div>
 
                 {/* Group components by match type when searching */}
