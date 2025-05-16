@@ -24,9 +24,6 @@ export default function SearchPage() {
 
   return (
     <div className="min-h-screen">
-      <AttentionBanner />
-      <SiteHeader />
-
       <div className="container mx-auto py-8 px-4">
         <h1 className="text-2xl font-bold mb-6">Search Products</h1>
 

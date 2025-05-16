@@ -6,8 +6,6 @@ import Image from "next/image"
 import Link from "next/link"
 import { ArrowLeft, X } from "lucide-react"
 import { ThemeToggle } from "@/components/theme-toggle"
-import { SiteHeader } from "@/components/site-header"
-import { AttentionBanner } from "@/components/attention-banner"
 
 interface Product {
   name: string
@@ -69,8 +67,6 @@ export default function ComparePage() {
   if (compareList.length === 0) {
     return (
       <div className="min-h-screen">
-        <AttentionBanner />
-        <SiteHeader />
         <div className="container mx-auto py-8 md:py-16 px-4 text-center">
           <h1 className="text-2xl md:text-3xl font-bold mb-6 md:mb-8">Compare Products</h1>
           <p className="text-muted-foreground mb-6 md:mb-8">No products added to comparison list</p>
@@ -158,8 +154,6 @@ export default function ComparePage() {
   // For the compare list view:
   return (
     <div className="min-h-screen">
-      <AttentionBanner />
-      <SiteHeader />
       <div className="container mx-auto py-6 md:py-8 px-4">
         <h1 className="text-2xl md:text-3xl font-bold mb-4 md:mb-8">Compare Products</h1>
 

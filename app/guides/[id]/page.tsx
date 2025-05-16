@@ -6,8 +6,6 @@ import { useState, useEffect } from "react"
 import { useParams, useRouter } from "next/navigation"
 import Image from "next/image"
 import Link from "next/link"
-import { SiteHeader } from "@/components/site-header"
-import { AttentionBanner } from "@/components/attention-banner"
 import { Button } from "@/components/ui/button"
 import {
   Cpu,
@@ -818,9 +816,6 @@ export default function GuidePage() {
 
   return (
     <div className="min-h-screen">
-      <AttentionBanner />
-      <SiteHeader />
-
       <div className="container mx-auto py-8 px-4">
         {/* Breadcrumb and back button */}
         <div className="flex items-center mb-6">

@@ -1,5 +1,7 @@
 "use server"
 
+import { sendSuggestionThankYouEmail } from "@/lib/email"
+
 interface SuggestionData {
   name: string
   email: string
@@ -49,8 +51,13 @@ export async function submitSuggestion(data: SuggestionData): Promise<SubmitResu
     }
 
     // Send to Discord webhook
-    const webhookUrl =
-      "https://discord.com/api/webhooks/1364643048528810096/w6lA216KNmhaUWuwadzB9m9rWcn3Yhx3PMu-kF2CCJyEUqBVFovQcrsivwKnCJ1r0CqG"
+    const webhookUrl = process.env.DISCORD_SUGGESTION_WEBHOOK_URL
+
+    if (!webhookUrl) {
+      console.error("Missing DISCORD_SUGGESTION_WEBHOOK_URL environment variable")
+      return { success: false, error: "Server configuration error" }
+    }
+
     const response = await fetch(webhookUrl, {
       method: "POST",
       headers: {
@@ -63,6 +70,17 @@ export async function submitSuggestion(data: SuggestionData): Promise<SubmitResu
       const errorText = await response.text()
       console.error("Discord webhook error:", errorText)
       return { success: false, error: "Failed to send suggestion to our team" }
+    }
+
+    // Send thank you email (non-blocking, won't affect success response)
+    try {
+      // We don't await this to ensure the function continues even if email fails
+      sendSuggestionThankYouEmail(data.name, data.email).catch((error) => {
+        console.error("Error sending thank you email:", error)
+      })
+    } catch (emailError) {
+      // Log error but don't fail the submission
+      console.error("Failed to send thank you email:", emailError)
     }
 
     return { success: true }

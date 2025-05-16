@@ -1,8 +1,6 @@
 import type React from "react"
 import Link from "next/link"
 import Image from "next/image"
-import { SiteHeader } from "@/components/site-header"
-import { AttentionBanner } from "@/components/attention-banner"
 import { Button } from "@/components/ui/button"
 import { Cpu, Fan, Layers, MemoryStickIcon, HardDrive, Tv2, Box, Zap, ArrowRight, BookOpen } from "lucide-react"
 
@@ -97,9 +95,6 @@ const guideCategories = [
 export default function GuidesPage() {
   return (
     <div className="min-h-screen">
-      <AttentionBanner />
-      <SiteHeader />
-
       <div className="container mx-auto py-8 px-4">
         {/* Hero section */}
         <div className="bg-gradient-to-b from-background to-muted/50 border rounded-lg p-8 mb-12">

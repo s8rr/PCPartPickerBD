@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import {
   Plus,
-  Save,
   Share,
   ShoppingCart,
   Cpu,
@@ -26,11 +25,10 @@ import {
   Loader2,
 } from "lucide-react"
 import Image from "next/image"
-import { SiteHeader } from "@/components/site-header"
-import { AttentionBanner } from "@/components/attention-banner"
 import { ProductTooltip } from "@/components/product-tooltip"
 import { useToast } from "@/hooks/use-toast"
 import { useRouter } from "next/navigation"
+import React from "react"
 
 // Define component types
 interface PCComponent {
@@ -42,6 +40,7 @@ interface PCComponent {
   url: string
   availability: string
   specs?: Record<string, string>
+  id?: string // Add unique ID for multiple components
 }
 
 interface CrossSiteComponent {
@@ -89,8 +88,9 @@ export default function BuildPage() {
   const [totalPCHouse, setTotalPCHouse] = useState(0)
   // Add a new state variable for Skyland total:
   const [totalSkyland, setTotalSkyland] = useState(0)
-  const [selectedComponents, setSelectedComponents] = useState<Record<string, PCComponent | null>>({})
-  const [crossSitePrices, setCrossSitePrices] = useState<Record<string, CrossSitePrices>>({})
+  // Update the state variable to store arrays of components
+  const [selectedComponents, setSelectedComponents] = useState<Record<string, PCComponent[]>>({})
+  const [crossSitePrices, setCrossSitePrices] = useState<Record<string, Record<string, CrossSitePrices>>>({})
   const [loading, setLoading] = useState(true)
   const [crossSiteLoading, setCrossSiteLoading] = useState<Record<string, boolean>>({})
   // Add state for mobile accordion
@@ -101,7 +101,7 @@ export default function BuildPage() {
   const { toast } = useToast()
   const router = useRouter()
 
-  // Load build from localStorage on component mount
+  // Update the useEffect for loading from localStorage
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search)
     const buildId = urlParams.get("build")
@@ -117,20 +117,49 @@ export default function BuildPage() {
     const savedCrossSitePrices = localStorage.getItem("pcBuildCrossSitePrices")
 
     if (savedBuild) {
-      const parsedBuild = JSON.parse(savedBuild)
-      setSelectedComponents(parsedBuild)
+      try {
+        const parsedBuild = JSON.parse(savedBuild)
 
-      // If we have saved cross-site prices, load them
-      if (savedCrossSitePrices) {
-        const parsedCrossSitePrices = JSON.parse(savedCrossSitePrices)
-        setCrossSitePrices(parsedCrossSitePrices)
-      } else {
-        // Otherwise fetch cross-site prices for each component
+        // Convert old format to new format if needed
+        const formattedBuild: Record<string, PCComponent[]> = {}
+
         Object.entries(parsedBuild).forEach(([type, component]) => {
-          if (component) {
-            fetchCrossSitePrices(type, component)
+          if (Array.isArray(component)) {
+            // Already in new format
+            formattedBuild[type] = component
+          } else if (component) {
+            // Convert old format to new format
+            const typedComponent = component as PCComponent
+            if (!typedComponent.id) {
+              typedComponent.id = Math.random().toString(36).substring(2, 9)
+            }
+            formattedBuild[type] = [typedComponent]
           }
         })
+
+        setSelectedComponents(formattedBuild)
+
+        // If we have saved cross-site prices, load them
+        if (savedCrossSitePrices) {
+          try {
+            const parsedCrossSitePrices = JSON.parse(savedCrossSitePrices)
+            setCrossSitePrices(parsedCrossSitePrices)
+          } catch (error) {
+            console.error("Error parsing saved cross-site prices:", error)
+          }
+        } else {
+          // Otherwise fetch cross-site prices for each component
+          Object.entries(formattedBuild).forEach(([type, components]) => {
+            if (components && components.length > 0) {
+              components.forEach((component) => {
+                fetchCrossSitePrices(type, component)
+              })
+            }
+          })
+        }
+      } catch (error) {
+        console.error("Error parsing saved build:", error)
+        setSelectedComponents({})
       }
     }
 
@@ -142,7 +171,7 @@ export default function BuildPage() {
     return () => clearTimeout(timer)
   }, [router, toast])
 
-  // Function to fetch a shared build by ID
+  // Update the fetchSharedBuild function
   const fetchSharedBuild = async (buildId: string) => {
     try {
       setLoading(true) // Show loading state while fetching
@@ -160,9 +189,11 @@ export default function BuildPage() {
       }
 
       // Convert the shared build format back to our component format
-      const formattedBuild = Object.entries(data.build).reduce(
-        (acc, [type, data]: [string, any]) => {
-          acc[type] = {
+      const formattedBuild: Record<string, PCComponent[]> = {}
+
+      Object.entries(data.build).forEach(([type, componentData]: [string, any]) => {
+        if (Array.isArray(componentData)) {
+          formattedBuild[type] = componentData.map((data: any) => ({
             type,
             name: data.name,
             price: data.price,
@@ -170,11 +201,23 @@ export default function BuildPage() {
             source: data.source,
             url: data.url,
             availability: data.availability || "In Stock",
-          }
-          return acc
-        },
-        {} as Record<string, PCComponent>,
-      )
+            id: data.id || Math.random().toString(36).substring(2, 9),
+          }))
+        } else {
+          formattedBuild[type] = [
+            {
+              type,
+              name: componentData.name,
+              price: componentData.price,
+              image: componentData.image || "",
+              source: componentData.source,
+              url: componentData.url,
+              availability: componentData.availability || "In Stock",
+              id: Math.random().toString(36).substring(2, 9),
+            },
+          ]
+        }
+      })
 
       // Clear existing components and cross-site prices completely
       setSelectedComponents(formattedBuild)
@@ -185,9 +228,11 @@ export default function BuildPage() {
       localStorage.removeItem("pcBuildCrossSitePrices") // Clear cross-site prices
 
       // Fetch cross-site prices for each component
-      Object.entries(formattedBuild).forEach(([type, component]) => {
-        if (component) {
-          fetchCrossSitePrices(type, component)
+      Object.entries(formattedBuild).forEach(([type, components]) => {
+        if (components && components.length > 0) {
+          components.forEach((component) => {
+            fetchCrossSitePrices(type, component)
+          })
         }
       })
 
@@ -212,7 +257,9 @@ export default function BuildPage() {
     }
   }
 
-  // Update the useEffect for calculating totals to include base total calculation
+  // Update the useEffect for calculating totals to fix the other retailer totals
+  // Replace the entire useEffect for calculating totals with this updated version:
+
   useEffect(() => {
     let baseTotal = 0
     let startechTotal = 0
@@ -222,82 +269,92 @@ export default function BuildPage() {
     let pchouseTotal = 0
     let skylandTotal = 0
 
-    console.log("Selected components:", selectedComponents)
+    // First, calculate the base total from selected components
+    Object.entries(selectedComponents).forEach(([type, components]) => {
+      components?.forEach((component) => {
+        if (component) {
+          // Extract the numeric price value, handling discounted prices correctly
+          const price = component.price
+          const numericPrice = extractNumericPrice(price)
 
-    // Calculate base total from selected components only
-    Object.entries(selectedComponents).forEach(([type, component]) => {
-      if (component) {
-        // Extract the numeric price value, handling discounted prices correctly
-        const price = component.price
-        const numericPrice = extractNumericPrice(price)
-        console.log(`Component ${type} price: ${price}, extracted: ${numericPrice}`)
+          if (numericPrice > 0) {
+            // Add to base total regardless of source
+            baseTotal += numericPrice
 
-        if (numericPrice > 0) {
-          // Add to base total regardless of source
-          baseTotal += numericPrice
-
-          // Also add to the specific retailer total
-          if (component.source === "Startech") {
-            startechTotal += numericPrice
-          } else if (component.source === "Techland") {
-            techlandTotal += numericPrice
-          } else if (component.source === "UltraTech") {
-            ultratechTotal += numericPrice
-          } else if (component.source === "Potaka IT") {
-            potakaitTotal += numericPrice
-          } else if (component.source === "PC House") {
-            pchouseTotal += numericPrice
-          } else if (component.source === "Skyland") {
-            skylandTotal += numericPrice
-          }
-        }
-      }
-    })
-
-    // Add cross-site prices for components not selected from each retailer
-    Object.entries(crossSitePrices).forEach(([type, prices]) => {
-      // Skip if this component type is already selected
-      if (selectedComponents[type]) {
-        const selectedSource = selectedComponents[type]?.source
-
-        // For each retailer that isn't the source of the selected component,
-        // add the cross-site price to that retailer's total
-        Object.entries(prices).forEach(([retailer, component]) => {
-          if (component && retailer !== selectedSource) {
-            // Extract the numeric price value, handling discounted prices correctly
-            const price = component.price
-            const numericPrice = extractNumericPrice(price)
-            console.log(`Cross-site ${type} for ${retailer} price: ${price}, extracted: ${numericPrice}`)
-
-            if (numericPrice > 0) {
-              // Add to the specific retailer total
-              if (retailer === "Startech") {
-                startechTotal += numericPrice
-              } else if (retailer === "Techland") {
-                techlandTotal += numericPrice
-              } else if (retailer === "UltraTech") {
-                ultratechTotal += numericPrice
-              } else if (retailer === "Potaka IT") {
-                potakaitTotal += numericPrice
-              } else if (retailer === "PC House") {
-                pchouseTotal += numericPrice
-              } else if (retailer === "Skyland") {
-                skylandTotal += numericPrice
-              }
+            // Also add to the specific retailer total
+            if (component.source === "Startech") {
+              startechTotal += numericPrice
+            } else if (component.source === "Techland") {
+              techlandTotal += numericPrice
+            } else if (component.source === "UltraTech") {
+              ultratechTotal += numericPrice
+            } else if (component.source === "Potaka IT") {
+              potakaitTotal += numericPrice
+            } else if (component.source === "PC House") {
+              pchouseTotal += numericPrice
+            } else if (component.source === "Skyland") {
+              skylandTotal += numericPrice
             }
           }
-        })
-      }
+        }
+      })
     })
 
-    console.log("Calculated totals:", {
-      baseTotal,
-      startechTotal,
-      techlandTotal,
-      ultratechTotal,
-      potakaitTotal,
-      pchouseTotal,
-      skylandTotal,
+    // Create a map to track which component types we've already handled for each retailer
+    const handledComponents = {
+      Startech: new Set(),
+      Techland: new Set(),
+      UltraTech: new Set(),
+      "Potaka IT": new Set(),
+      "PC House": new Set(),
+      Skyland: new Set(),
+    }
+
+    // Mark components that are already selected for each retailer
+    Object.entries(selectedComponents).forEach(([type, components]) => {
+      components?.forEach((component) => {
+        if (component && component.source) {
+          handledComponents[component.source].add(type)
+        }
+      })
+    })
+
+    // Now add cross-site prices for components not selected from each retailer
+    Object.entries(crossSitePrices).forEach(([type, pricesByType]) => {
+      // For each component type
+      Object.entries(pricesByType).forEach(([componentId, prices]) => {
+        if (prices && componentId === "default") {
+          // For each retailer's price for this component
+          Object.entries(prices).forEach(([retailer, component]) => {
+            // Only add if we haven't already handled this component type for this retailer
+            if (component && !handledComponents[retailer]?.has(type)) {
+              // Extract the numeric price value
+              const price = component.price
+              const numericPrice = extractNumericPrice(price)
+
+              if (numericPrice > 0) {
+                // Add to the specific retailer total
+                if (retailer === "Startech") {
+                  startechTotal += numericPrice
+                } else if (retailer === "Techland") {
+                  techlandTotal += numericPrice
+                } else if (retailer === "UltraTech") {
+                  ultratechTotal += numericPrice
+                } else if (retailer === "Potaka IT") {
+                  potakaitTotal += numericPrice
+                } else if (retailer === "PC House") {
+                  pchouseTotal += numericPrice
+                } else if (retailer === "Skyland") {
+                  skylandTotal += numericPrice
+                }
+
+                // Mark this component type as handled for this retailer
+                handledComponents[retailer].add(type)
+              }
+            }
+          })
+        }
+      })
     })
 
     setTotalBase(baseTotal)
@@ -353,9 +410,12 @@ export default function BuildPage() {
 
   // Function to fetch cross-site prices for a component
   const fetchCrossSitePrices = async (type: string, component: PCComponent) => {
-    setCrossSiteLoading((prev) => ({ ...prev, [type]: true }))
+    const componentId = component.id || "default"
+    setCrossSiteLoading((prev) => ({ ...prev, [componentId]: true }))
 
     try {
+      console.log(`Fetching cross-site prices for ${component.name} (${componentId})`)
+
       // Add timeout to prevent hanging requests
       const controller = new AbortController()
       const timeoutId = setTimeout(() => controller.abort(), 30000) // 30 second timeout
@@ -375,41 +435,64 @@ export default function BuildPage() {
       }
 
       const data = await response.json()
+      console.log(`Received cross-site prices for ${component.name}:`, data)
 
       setCrossSitePrices((prev) => {
-        const updated = {
-          ...prev,
-          [type]: data.crossSiteProducts,
+        // Create a deep copy of the previous state
+        const updated = JSON.parse(JSON.stringify(prev))
+
+        // Initialize the type object if it doesn't exist
+        if (!updated[type]) {
+          updated[type] = {}
+        }
+
+        // Store the prices using the component's ID
+        updated[type][componentId] = data.crossSiteProducts
+
+        // Also store under "default" if this is the first component of its type
+        if (!updated[type].default || componentId === "default") {
+          updated[type].default = data.crossSiteProducts
         }
 
         // Save to localStorage
         localStorage.setItem("pcBuildCrossSitePrices", JSON.stringify(updated))
+        console.log(`Updated cross-site prices for ${component.name}`, updated)
 
         return updated
       })
     } catch (error) {
-      console.error("Error fetching cross-site prices:", error)
-      // Don't update state on error to keep previous data
+      console.error(`Error fetching cross-site prices for ${component.name}:`, error)
+      toast({
+        title: "Error fetching prices",
+        description: `Could not fetch prices for ${component.name}. Please try again.`,
+        variant: "destructive",
+      })
     } finally {
-      setCrossSiteLoading((prev) => ({ ...prev, [type]: false }))
+      setCrossSiteLoading((prev) => ({ ...prev, [componentId]: false }))
     }
   }
 
-  // Function to remove a component from the build
-  const removeComponent = (categoryId: string) => {
+  // Update the removeComponent function to handle component IDs
+  const removeComponent = (categoryId: string, componentId: string) => {
     const updatedComponents = { ...selectedComponents }
-    delete updatedComponents[categoryId]
 
-    // Also remove cross-site prices
-    const updatedCrossSitePrices = { ...crossSitePrices }
-    delete updatedCrossSitePrices[categoryId]
+    if (updatedComponents[categoryId]) {
+      // Filter out the component with the matching ID
+      updatedComponents[categoryId] = updatedComponents[categoryId].filter((comp) => comp.id !== componentId)
+
+      // If there are no more components of this type, remove the category
+      if (updatedComponents[categoryId].length === 0) {
+        delete updatedComponents[categoryId]
+      }
+    }
 
     setSelectedComponents(updatedComponents)
-    setCrossSitePrices(updatedCrossSitePrices)
-
-    // Update both in localStorage
     localStorage.setItem("pcBuild", JSON.stringify(updatedComponents))
-    localStorage.setItem("pcBuildCrossSitePrices", JSON.stringify(updatedCrossSitePrices))
+  }
+
+  // Add a function to add a new component slot
+  const addComponentSlot = (categoryId: string) => {
+    router.push(`/build/components/${categoryId}`)
   }
 
   // Function to handle price display
@@ -452,7 +535,7 @@ export default function BuildPage() {
   }
 
   // Function to select a cross-site component
-  const selectCrossSiteComponent = (type: string, component: CrossSiteComponent) => {
+  const selectCrossSiteComponent = (type: string, component: CrossSiteComponent, componentId = "default") => {
     const newComponent: PCComponent = {
       type,
       name: component.name,
@@ -462,9 +545,19 @@ export default function BuildPage() {
       url: component.url,
       availability: component.availability,
       specs: component.specs,
+      id: Math.random().toString(36).substring(2, 9),
     }
 
-    const updatedComponents = { ...selectedComponents, [type]: newComponent }
+    const updatedComponents = { ...selectedComponents }
+
+    // If this is a multi-component type (RAM, storage, monitor), add to array
+    if ((type === "memory" || type === "storage" || type === "monitor") && updatedComponents[type]) {
+      updatedComponents[type] = [...updatedComponents[type], newComponent]
+    } else {
+      // Otherwise replace existing component
+      updatedComponents[type] = [newComponent]
+    }
+
     setSelectedComponents(updatedComponents)
     localStorage.setItem("pcBuild", JSON.stringify(updatedComponents))
 
@@ -481,7 +574,7 @@ export default function BuildPage() {
     }
   }
 
-  // Function to handle sharing the build with short URL
+  // Update the handleShareBuild function
   const handleShareBuild = async () => {
     if (Object.keys(selectedComponents).length === 0) return
 
@@ -490,18 +583,19 @@ export default function BuildPage() {
     try {
       // Create a simplified version of the build with just the essential info
       const shareBuild = Object.entries(selectedComponents).reduce(
-        (acc, [type, component]) => {
-          if (component) {
-            acc[type] = {
+        (acc, [type, components]) => {
+          if (components && components.length > 0) {
+            acc[type] = components.map((component) => ({
+              id: component.id,
               name: component.name,
               price: component.price,
               source: component.source,
               url: component.url,
-            }
+            }))
           }
           return acc
         },
-        {} as Record<string, any>,
+        {} as Record<string, any[]>,
       )
 
       // Send the build data to our API to get a short ID
@@ -542,11 +636,8 @@ export default function BuildPage() {
       setIsSharing(false)
     }
   }
-
   return (
     <div className="min-h-screen">
-      <AttentionBanner />
-      <SiteHeader />
       <div className="container mx-auto py-6 md:py-8 px-4">
         <div className="bg-card rounded-lg shadow-sm p-4 mb-6">
           <div className="flex flex-wrap gap-4 justify-between items-center">
@@ -555,10 +646,24 @@ export default function BuildPage() {
               <p className="text-muted-foreground text-sm">Select components to build your PC</p>
             </div>
             <div className="flex gap-2">
-              <Button variant="outline" size="sm">
-                <Save className="mr-2 h-4 w-4" />
-                <span className="hidden sm:inline">Save Build</span>
-                <span className="sm:hidden">Save</span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  // Clear all selected components
+                  setSelectedComponents({})
+                  setCrossSitePrices({})
+                  localStorage.removeItem("pcBuild")
+                  localStorage.removeItem("pcBuildCrossSitePrices")
+                  toast({
+                    title: "Build cleared",
+                    description: "All components have been removed from your build.",
+                  })
+                }}
+              >
+                <RefreshCw className="mr-2 h-4 w-4" />
+                <span className="hidden sm:inline">Clear Build</span>
+                <span className="sm:hidden">Clear</span>
               </Button>
               <Button
                 variant="outline"
@@ -602,12 +707,14 @@ export default function BuildPage() {
                   <span className="font-medium">{category.label}</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  {selectedComponents[category.id] && (
+                  {selectedComponents[category.id] && selectedComponents[category.id].length > 0 && (
                     <span className="text-sm font-medium text-primary">
-                      {renderPrice(
-                        selectedComponents[category.id]?.price || "",
-                        selectedComponents[category.id]?.source || "",
-                      )}
+                      {selectedComponents[category.id].length > 1
+                        ? `${selectedComponents[category.id].length} items`
+                        : renderPrice(
+                            selectedComponents[category.id][0]?.price || "",
+                            selectedComponents[category.id][0]?.source || "",
+                          )}
                     </span>
                   )}
                   {expandedCategory === category.id ? (
@@ -628,94 +735,63 @@ export default function BuildPage() {
                         <Skeleton className="h-3 w-20" />
                       </div>
                     </div>
-                  ) : selectedComponents[category.id] ? (
+                  ) : selectedComponents[category.id] && selectedComponents[category.id].length > 0 ? (
                     <div className="space-y-4">
-                      <div className="flex items-start gap-3">
-                        <div className="w-12 h-12 bg-white rounded relative flex-shrink-0">
-                          {selectedComponents[category.id]?.image ? (
-                            <Image
-                              src={selectedComponents[category.id]?.image || ""}
-                              alt={selectedComponents[category.id]?.name || ""}
-                              fill
-                              className="object-contain p-1"
-                            />
-                          ) : (
-                            <div className="flex items-center justify-center h-full text-muted-foreground text-xs">
-                              No image
+                      {selectedComponents[category.id].map((component, index) => (
+                        <div key={component.id || index} className="space-y-4">
+                          {index > 0 && <div className="border-t pt-4"></div>}
+                          <div className="flex items-start gap-3">
+                            <div className="w-12 h-12 bg-white rounded relative flex-shrink-0">
+                              {component.image ? (
+                                <Image
+                                  src={component.image || ""}
+                                  alt={component.name || ""}
+                                  fill
+                                  className="object-contain p-1"
+                                />
+                              ) : (
+                                <div className="flex items-center justify-center h-full text-muted-foreground text-xs">
+                                  No image
+                                </div>
+                              )}
                             </div>
-                          )}
-                        </div>
-                        <div className="flex-1">
-                          {selectedComponents[category.id] && (
-                            <ProductTooltip product={selectedComponents[category.id]!}>
-                              <div className="font-medium text-sm truncate">
-                                {truncateName(selectedComponents[category.id]?.name || "", 4)}
+                            <div className="flex-1">
+                              <ProductTooltip product={component}>
+                                <div className="font-medium text-sm truncate">
+                                  {truncateName(component.name || "", 4)}
+                                </div>
+                              </ProductTooltip>
+                              <div className="flex gap-2 mt-1">
+                                <Link href={`/build/components/${category.id}`}>
+                                  <Button variant="link" className="p-0 h-auto text-xs text-muted-foreground">
+                                    Change
+                                  </Button>
+                                </Link>
+                                <Button
+                                  variant="link"
+                                  className="p-0 h-auto text-xs text-red-500"
+                                  onClick={() => removeComponent(category.id, component.id || "")}
+                                >
+                                  Remove
+                                </Button>
                               </div>
-                            </ProductTooltip>
-                          )}
-                          <div className="flex gap-2 mt-1">
-                            <Link href={`/build/components/${category.id}`}>
-                              <Button variant="link" className="p-0 h-auto text-xs text-muted-foreground">
-                                Change
-                              </Button>
-                            </Link>
-                            <Button
-                              variant="link"
-                              className="p-0 h-auto text-xs text-red-500"
-                              onClick={() => removeComponent(category.id)}
-                            >
-                              Remove
-                            </Button>
+                            </div>
                           </div>
                         </div>
-                      </div>
+                      ))}
 
-                      {/* Cross-site prices */}
-                      {Object.entries(crossSitePrices[category.id] || {}).map(([retailer, component]) => {
-                        if (!component) return null
-                        return (
-                          <div key={retailer} className="flex items-center justify-between border-t pt-3">
-                            <div className="flex items-center gap-2">
-                              <div
-                                className={`h-6 w-6 rounded ${
-                                  retailer === "Startech"
-                                    ? "bg-blue-900"
-                                    : retailer === "Techland"
-                                      ? "bg-gray-900"
-                                      : retailer === "UltraTech"
-                                        ? "bg-purple-900"
-                                        : retailer === "Potaka IT"
-                                          ? "bg-green-900"
-                                          : retailer === "PC House"
-                                            ? "bg-red-900"
-                                            : "bg-teal-900"
-                                } flex items-center justify-center text-white text-xs`}
-                              >
-                                {retailer === "Startech"
-                                  ? "ST"
-                                  : retailer === "Techland"
-                                    ? "TL"
-                                    : retailer === "UltraTech"
-                                      ? "UT"
-                                      : retailer === "Potaka IT"
-                                        ? "PI"
-                                        : retailer === "PC House"
-                                          ? "PC"
-                                          : "SK"}
-                              </div>
-                              <div className="text-sm">{renderPrice(component.price, retailer)}</div>
-                            </div>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="h-7 text-xs"
-                              onClick={() => selectCrossSiteComponent(category.id, component)}
-                            >
-                              Select
-                            </Button>
-                          </div>
-                        )
-                      })}
+                      {/* Add button for multiple components */}
+                      {(category.id === "memory" || category.id === "storage" || category.id === "monitor") && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="w-full mt-2 text-xs h-7"
+                          onClick={() => addComponentSlot(category.id)}
+                        >
+                          <Plus className="mr-1 h-3 w-3" />
+                          Add Another {category.label}
+                        </Button>
+                      )}
                     </div>
                   ) : (
                     <Link href={`/build/components/${category.id}`}>
@@ -760,56 +836,57 @@ export default function BuildPage() {
           </div>
         </div>
 
+        {/* Replace the desktop view section with this updated version */}
         {/* Desktop view */}
         <div className="hidden md:block overflow-x-auto rounded-lg border">
           <table className="w-full border-collapse">
             <thead>
               <tr className="bg-muted rounded-t-lg">
-                <th className="p-2 text-left font-medium text-xs">Component</th>
-                <th className="p-2 text-left font-medium text-xs">Selection</th>
-                <th className="p-2 text-left font-medium text-xs">Base</th>
-                <th className="p-2 text-left font-medium text-xs">
-                  <div className="flex items-center">
+                <th className="p-2 text-center font-medium text-xs">Component</th>
+                <th className="p-2 text-center font-medium text-xs">Selection</th>
+                <th className="p-2 text-center font-medium text-xs">Base</th>
+                <th className="p-2 text-center font-medium text-xs">
+                  <div className="flex items-center justify-center">
                     <div className="h-5 w-5 rounded-full bg-blue-900 flex items-center justify-center text-white text-[10px] mr-1.5 shadow-sm">
                       ST
                     </div>
                     <span>Startech</span>
                   </div>
                 </th>
-                <th className="p-2 text-left font-medium text-xs">
-                  <div className="flex items-center">
+                <th className="p-2 text-center font-medium text-xs">
+                  <div className="flex items-center justify-center">
                     <div className="h-5 w-5 rounded-full bg-gray-900 flex items-center justify-center text-white text-[10px] mr-1.5 shadow-sm">
                       TL
                     </div>
                     <span>Techland</span>
                   </div>
                 </th>
-                <th className="p-2 text-left font-medium text-xs">
-                  <div className="flex items-center">
+                <th className="p-2 text-center font-medium text-xs">
+                  <div className="flex items-center justify-center">
                     <div className="h-5 w-5 rounded-full bg-purple-900 flex items-center justify-center text-white text-[10px] mr-1.5 shadow-sm">
                       UT
                     </div>
                     <span>UltraTech</span>
                   </div>
                 </th>
-                <th className="p-2 text-left font-medium text-xs">
-                  <div className="flex items-center">
+                <th className="p-2 text-center font-medium text-xs">
+                  <div className="flex items-center justify-center">
                     <div className="h-5 w-5 rounded-full bg-green-900 flex items-center justify-center text-white text-[10px] mr-1.5 shadow-sm">
                       PI
                     </div>
                     <span>Potaka IT</span>
                   </div>
                 </th>
-                <th className="p-2 text-left font-medium text-xs">
-                  <div className="flex items-center">
+                <th className="p-2 text-center font-medium text-xs">
+                  <div className="flex items-center justify-center">
                     <div className="h-5 w-5 rounded-full bg-red-900 flex items-center justify-center text-white text-[10px] mr-1.5 shadow-sm">
                       PC
                     </div>
                     <span>PC House</span>
                   </div>
                 </th>
-                <th className="p-2 text-left font-medium text-xs">
-                  <div className="flex items-center">
+                <th className="p-2 text-center font-medium text-xs">
+                  <div className="flex items-center justify-center">
                     <div className="h-5 w-5 rounded-full bg-teal-900 flex items-center justify-center text-white text-[10px] mr-1.5 shadow-sm">
                       SK
                     </div>
@@ -819,474 +896,995 @@ export default function BuildPage() {
               </tr>
             </thead>
             <tbody>
-              {componentCategories.map((category) => (
-                <tr key={category.id} className="border-b">
-                  <td className="p-2">
-                    <Link
-                      href={`/build/components/${category.id}`}
-                      className="text-primary hover:underline flex items-center"
-                    >
-                      <category.icon className="mr-1.5 h-3 w-3" />
-                      <span className="text-xs">{category.label}</span>
-                    </Link>
-                  </td>
-                  <td className="p-2">
-                    {loading ? (
-                      <div className="flex items-start gap-2">
-                        <Skeleton className="w-10 h-10 rounded" />
-                        <div className="flex-1">
-                          <Skeleton className="h-3 w-28 mb-1" />
-                          <Skeleton className="h-2 w-16" />
-                        </div>
-                      </div>
-                    ) : selectedComponents[category.id] ? (
-                      <div className="flex items-start gap-2">
-                        <div className="w-10 h-10 bg-white rounded relative flex-shrink-0">
-                          {selectedComponents[category.id]?.image ? (
-                            <Image
-                              src={selectedComponents[category.id]?.image || ""}
-                              alt={selectedComponents[category.id]?.name || ""}
-                              fill
-                              className="object-contain p-1"
-                            />
-                          ) : (
-                            <div className="flex items-center justify-center h-full text-muted-foreground text-xs">
-                              No image
-                            </div>
-                          )}
-                        </div>
-                        <div className="flex-1">
-                          {selectedComponents[category.id] && (
-                            <ProductTooltip product={selectedComponents[category.id]!}>
-                              <div className="font-medium text-xs truncate max-w-[180px]">
-                                {truncateName(selectedComponents[category.id]?.name || "", 4)}
-                              </div>
-                            </ProductTooltip>
-                          )}
-                          <div className="flex gap-1 mt-1">
-                            <Link href={`/build/components/${category.id}`}>
-                              <Button variant="link" className="p-0 h-auto text-[10px] text-muted-foreground">
-                                Change
+              {componentCategories.map((category) => {
+                // Check if we have components for this category
+                const hasComponents = selectedComponents[category.id] && selectedComponents[category.id].length > 0
+
+                return (
+                  <React.Fragment key={category.id}>
+                    {/* Main category row */}
+                    <tr className="border-b">
+                      <td className="p-2">
+                        <div className="flex flex-col gap-1">
+                          <Link
+                            href={`/build/components/${category.id}`}
+                            className="text-primary hover:underline flex items-center"
+                          >
+                            <category.icon className="mr-1.5 h-3 w-3" />
+                            <span className="text-xs">{category.label}</span>
+                          </Link>
+
+                          {/* Add another button for specific components */}
+                          {(category.id === "memory" || category.id === "storage" || category.id === "monitor") &&
+                            hasComponents && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-5 px-1.5 text-xs text-primary border-primary/30 hover:bg-primary/5 hover:text-primary hover:border-primary mt-1"
+                                onClick={() => addComponentSlot(category.id)}
+                              >
+                                <Plus className="h-3 w-3 mr-0.5" />
+                                Add another
                               </Button>
-                            </Link>
-                            <Button
-                              variant="link"
-                              className="p-0 h-auto text-[10px] text-red-500"
-                              onClick={() => removeComponent(category.id)}
-                            >
-                              Remove
-                            </Button>
-                            <Button
-                              variant="link"
-                              className="p-0 h-auto text-[10px] text-primary"
-                              onClick={() => refreshCrossSitePrices(category.id, selectedComponents[category.id]!)}
-                              disabled={crossSiteLoading[category.id]}
-                            >
-                              {crossSiteLoading[category.id] ? (
-                                <RefreshCw className="h-2 w-2 mr-0.5 animate-spin" />
-                              ) : (
-                                <RefreshCw className="h-2 w-2 mr-0.5" />
-                              )}
-                              Compare
-                            </Button>
+                            )}
+                        </div>
+                      </td>
+                      <td className="p-2">
+                        {loading ? (
+                          <div className="flex items-start gap-2">
+                            <Skeleton className="w-10 h-10 rounded" />
+                            <div className="flex-1">
+                              <Skeleton className="h-3 w-28 mb-1" />
+                              <Skeleton className="h-2 w-16" />
+                            </div>
                           </div>
-                        </div>
-                      </div>
-                    ) : (
-                      <Link href={`/build/components/${category.id}`}>
-                        <Button size="sm" variant="secondary" className="flex items-center h-7 text-xs">
-                          <Plus className="mr-1 h-3 w-3" />
-                          Choose {category.label === "Memory" || category.label === "Storage" ? "" : "A"}{" "}
-                          {category.label}
-                        </Button>
-                      </Link>
-                    )}
-                  </td>
-                  <td className="p-2">
-                    {loading ? (
-                      <Skeleton className="h-5 w-16 ml-auto" />
-                    ) : selectedComponents[category.id] ? (
-                      <div className="text-right font-medium text-sm">
-                        {renderPrice(
-                          selectedComponents[category.id]?.price || "",
-                          selectedComponents[category.id]?.source || "",
+                        ) : hasComponents ? (
+                          <div className="flex flex-col gap-2">
+                            <div className="flex items-start gap-2">
+                              <div className="w-10 h-10 bg-white rounded relative flex-shrink-0">
+                                {selectedComponents[category.id][0]?.image ? (
+                                  <Image
+                                    src={selectedComponents[category.id][0]?.image || ""}
+                                    alt={selectedComponents[category.id][0]?.name || ""}
+                                    fill
+                                    className="object-contain p-1"
+                                  />
+                                ) : (
+                                  <div className="flex items-center justify-center h-full text-muted-foreground text-xs">
+                                    No image
+                                  </div>
+                                )}
+                              </div>
+                              <div className="flex-1">
+                                <ProductTooltip product={selectedComponents[category.id][0]!}>
+                                  <div className="font-medium text-xs truncate max-w-[180px]">
+                                    {truncateName(selectedComponents[category.id][0]?.name || "", 4)}
+                                    {selectedComponents[category.id].length > 1 && (
+                                      <span className="ml-1 text-primary">
+                                        +{selectedComponents[category.id].length - 1} more
+                                      </span>
+                                    )}
+                                  </div>
+                                </ProductTooltip>
+                                <div className="flex gap-1 mt-1">
+                                  <Link href={`/build/components/${category.id}`}>
+                                    <Button variant="link" className="p-0 h-auto text-[10px] text-muted-foreground">
+                                      Change
+                                    </Button>
+                                  </Link>
+                                  <Button
+                                    variant="link"
+                                    className="p-0 h-auto text-[10px] text-red-500"
+                                    onClick={() =>
+                                      removeComponent(category.id, selectedComponents[category.id][0]?.id || "")
+                                    }
+                                  >
+                                    Remove
+                                  </Button>
+                                  <Button
+                                    variant="link"
+                                    className="p-0 h-auto text-[10px] text-primary"
+                                    onClick={() =>
+                                      refreshCrossSitePrices(category.id, selectedComponents[category.id][0]!)
+                                    }
+                                    disabled={crossSiteLoading[selectedComponents[category.id][0]?.id || ""]}
+                                  >
+                                    {crossSiteLoading[selectedComponents[category.id][0]?.id || ""] ? (
+                                      <RefreshCw className="h-2 w-2 mr-0.5 animate-spin" />
+                                    ) : (
+                                      <RefreshCw className="h-2 w-2 mr-0.5" />
+                                    )}
+                                    Compare
+                                  </Button>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        ) : (
+                          <Link href={`/build/components/${category.id}`}>
+                            <Button size="sm" variant="secondary" className="flex items-center h-7 text-xs">
+                              <Plus className="mr-1 h-3 w-3" />
+                              Choose {category.label === "Memory" || category.label === "Storage" ? "" : "A"}{" "}
+                              {category.label}
+                            </Button>
+                          </Link>
                         )}
-                      </div>
-                    ) : (
-                      <div className="text-right">-</div>
-                    )}
-                  </td>
-                  <td className="p-2">
-                    {loading ? (
-                      <Skeleton className="h-5 w-16" />
-                    ) : selectedComponents[category.id]?.source === "Startech" ? (
-                      <div className="flex flex-col space-y-1">
-                        <div className="font-medium text-sm text-right">
-                          {renderPrice(selectedComponents[category.id]?.price || "", "Startech")}
-                        </div>
-                        <div className="flex items-center justify-end gap-1 mt-1">
-                          <div className="px-1.5 py-0.5 bg-primary/10 text-xs rounded text-primary">Selected</div>
-                          <a href={selectedComponents[category.id]?.url} target="_blank" rel="noopener noreferrer">
-                            <Button variant="ghost" size="sm" className="h-5 px-1.5 text-xs">
-                              <ExternalLink className="h-3 w-3" />
-                            </Button>
-                          </a>
-                        </div>
-                      </div>
-                    ) : crossSitePrices[category.id]?.Startech ? (
-                      <div className="flex flex-col space-y-1">
-                        <div className="font-medium text-sm text-right">
-                          {renderPrice(crossSitePrices[category.id]?.Startech?.price || "", "Startech")}
-                        </div>
-                        <div className="flex items-center justify-end gap-1 mt-1">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="h-5 px-1.5 text-xs text-primary border-primary/30 hover:bg-primary/5 hover:text-primary hover:border-primary"
-                            onClick={() =>
-                              selectCrossSiteComponent(category.id, crossSitePrices[category.id]?.Startech!)
-                            }
-                          >
-                            <Check className="h-3 w-3 mr-0.5" />
-                            Select
-                          </Button>
-                          <a
-                            href={crossSitePrices[category.id]?.Startech?.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                          >
-                            <Button variant="ghost" size="sm" className="h-5 px-1.5 text-xs">
-                              <ExternalLink className="h-3 w-3" />
-                            </Button>
-                          </a>
-                        </div>
-                      </div>
-                    ) : (
-                      <span className="text-muted-foreground text-sm text-right block">N/A</span>
-                    )}
-                  </td>
-                  <td className="p-2">
-                    {loading ? (
-                      <Skeleton className="h-5 w-16" />
-                    ) : selectedComponents[category.id]?.source === "Techland" ? (
-                      <div className="flex flex-col space-y-1">
-                        <div className="font-medium text-sm text-right">
-                          {renderPrice(selectedComponents[category.id]?.price || "", "Techland")}
-                        </div>
-                        <div className="flex items-center justify-end gap-1 mt-1">
-                          <div className="px-1.5 py-0.5 bg-primary/10 text-xs rounded text-primary">Selected</div>
-                          <a href={selectedComponents[category.id]?.url} target="_blank" rel="noopener noreferrer">
-                            <Button variant="ghost" size="sm" className="h-5 px-1.5 text-xs">
-                              <ExternalLink className="h-3 w-3" />
-                            </Button>
-                          </a>
-                        </div>
-                      </div>
-                    ) : crossSitePrices[category.id]?.Techland ? (
-                      <div className="flex flex-col space-y-1">
-                        <div className="font-medium text-sm text-right">
-                          {renderPrice(crossSitePrices[category.id]?.Techland?.price || "", "Techland")}
-                        </div>
-                        <div className="flex items-center justify-end gap-1 mt-1">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="h-5 px-1.5 text-xs text-primary border-primary/30 hover:bg-primary/5 hover:text-primary hover:border-primary"
-                            onClick={() =>
-                              selectCrossSiteComponent(category.id, crossSitePrices[category.id]?.Techland!)
-                            }
-                          >
-                            <Check className="h-3 w-3 mr-0.5" />
-                            Select
-                          </Button>
-                          <a
-                            href={crossSitePrices[category.id]?.Techland?.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                          >
-                            <Button variant="ghost" size="sm" className="h-5 px-1.5 text-xs">
-                              <ExternalLink className="h-3 w-3" />
-                            </Button>
-                          </a>
-                        </div>
-                      </div>
-                    ) : (
-                      <span className="text-muted-foreground text-sm text-right block">N/A</span>
-                    )}
-                  </td>
-                  <td className="p-2">
-                    {loading ? (
-                      <Skeleton className="h-5 w-16" />
-                    ) : selectedComponents[category.id]?.source === "UltraTech" ? (
-                      <div className="flex flex-col space-y-1">
-                        <div className="font-medium text-sm text-right">
-                          {renderPrice(selectedComponents[category.id]?.price || "", "UltraTech")}
-                        </div>
-                        <div className="flex items-center justify-end gap-1 mt-1">
-                          <div className="px-1.5 py-0.5 bg-primary/10 text-xs rounded text-primary">Selected</div>
-                          <a href={selectedComponents[category.id]?.url} target="_blank" rel="noopener noreferrer">
-                            <Button variant="ghost" size="sm" className="h-5 px-1.5 text-xs">
-                              <ExternalLink className="h-3 w-3" />
-                            </Button>
-                          </a>
-                        </div>
-                      </div>
-                    ) : crossSitePrices[category.id]?.UltraTech ? (
-                      <div className="flex flex-col space-y-1">
-                        <div className="font-medium text-sm text-right">
-                          {renderPrice(crossSitePrices[category.id]?.UltraTech?.price || "", "UltraTech")}
-                        </div>
-                        <div className="flex items-center justify-end gap-1 mt-1">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="h-5 px-1.5 text-xs text-primary border-primary/30 hover:bg-primary/5 hover:text-primary hover:border-primary"
-                            onClick={() =>
-                              selectCrossSiteComponent(category.id, crossSitePrices[category.id]?.UltraTech!)
-                            }
-                          >
-                            <Check className="h-3 w-3 mr-0.5" />
-                            Select
-                          </Button>
-                          <a
-                            href={crossSitePrices[category.id]?.UltraTech?.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                          >
-                            <Button variant="ghost" size="sm" className="h-5 px-1.5 text-xs">
-                              <ExternalLink className="h-3 w-3" />
-                            </Button>
-                          </a>
-                        </div>
-                      </div>
-                    ) : (
-                      <span className="text-muted-foreground text-sm text-right block">N/A</span>
-                    )}
-                  </td>
-                  <td className="p-2">
-                    {loading ? (
-                      <Skeleton className="h-5 w-16" />
-                    ) : selectedComponents[category.id]?.source === "Potaka IT" ? (
-                      <div className="flex flex-col space-y-1">
-                        <div className="font-medium text-sm text-right">
-                          {renderPrice(selectedComponents[category.id]?.price || "", "Potaka IT")}
-                        </div>
-                        <div className="flex items-center justify-end gap-1 mt-1">
-                          <div className="px-1.5 py-0.5 bg-primary/10 text-xs rounded text-primary">Selected</div>
-                          <a href={selectedComponents[category.id]?.url} target="_blank" rel="noopener noreferrer">
-                            <Button variant="ghost" size="sm" className="h-5 px-1.5 text-xs">
-                              <ExternalLink className="h-3 w-3" />
-                            </Button>
-                          </a>
-                        </div>
-                      </div>
-                    ) : crossSitePrices[category.id]?.["Potaka IT"] ? (
-                      <div className="flex flex-col space-y-1">
-                        <div className="font-medium text-sm text-right">
-                          {renderPrice(crossSitePrices[category.id]?.["Potaka IT"]?.price || "", "Potaka IT")}
-                        </div>
-                        <div className="flex items-center justify-end gap-1 mt-1">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="h-5 px-1.5 text-xs text-primary border-primary/30 hover:bg-primary/5 hover:text-primary hover:border-primary"
-                            onClick={() =>
-                              selectCrossSiteComponent(category.id, crossSitePrices[category.id]?.["Potaka IT"]!)
-                            }
-                          >
-                            <Check className="h-3 w-3 mr-0.5" />
-                            Select
-                          </Button>
-                          <a
-                            href={crossSitePrices[category.id]?.["Potaka IT"]?.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                          >
-                            <Button variant="ghost" size="sm" className="h-5 px-1.5 text-xs">
-                              <ExternalLink className="h-3 w-3" />
-                            </Button>
-                          </a>
-                        </div>
-                      </div>
-                    ) : (
-                      <span className="text-muted-foreground text-sm text-right block">N/A</span>
-                    )}
-                  </td>
-                  <td className="p-2">
-                    {loading ? (
-                      <Skeleton className="h-5 w-16" />
-                    ) : selectedComponents[category.id]?.source === "PC House" ? (
-                      <div className="flex flex-col space-y-1">
-                        <div className="font-medium text-sm text-right">
-                          {renderPrice(selectedComponents[category.id]?.price || "", "PC House")}
-                        </div>
-                        <div className="flex items-center justify-end gap-1 mt-1">
-                          <div className="px-1.5 py-0.5 bg-primary/10 text-xs rounded text-primary">Selected</div>
-                          <a href={selectedComponents[category.id]?.url} target="_blank" rel="noopener noreferrer">
-                            <Button variant="ghost" size="sm" className="h-5 px-1.5 text-xs">
-                              <ExternalLink className="h-3 w-3" />
-                            </Button>
-                          </a>
-                        </div>
-                      </div>
-                    ) : crossSitePrices[category.id]?.["PC House"] ? (
-                      <div className="flex flex-col space-y-1">
-                        <div className="font-medium text-sm text-right">
-                          {renderPrice(crossSitePrices[category.id]?.["PC House"]?.price || "", "PC House")}
-                        </div>
-                        <div className="flex items-center justify-end gap-1 mt-1">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="h-5 px-1.5 text-xs text-primary border-primary/30 hover:bg-primary/5 hover:text-primary hover:border-primary"
-                            onClick={() =>
-                              selectCrossSiteComponent(category.id, crossSitePrices[category.id]?.["PC House"]!)
-                            }
-                          >
-                            <Check className="h-3 w-3 mr-0.5" />
-                            Select
-                          </Button>
-                          <a
-                            href={crossSitePrices[category.id]?.["PC House"]?.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                          >
-                            <Button variant="ghost" size="sm" className="h-5 px-1.5 text-xs">
-                              <ExternalLink className="h-3 w-3" />
-                            </Button>
-                          </a>
-                        </div>
-                      </div>
-                    ) : (
-                      <span className="text-muted-foreground text-sm text-right block">N/A</span>
-                    )}
-                  </td>
-                  <td className="p-2">
-                    {loading ? (
-                      <Skeleton className="h-5 w-16" />
-                    ) : selectedComponents[category.id]?.source === "Skyland" ? (
-                      <div className="flex flex-col space-y-1">
-                        <div className="font-medium text-sm text-right">
-                          {renderPrice(selectedComponents[category.id]?.price || "", "Skyland")}
-                        </div>
-                        <div className="flex items-center justify-end gap-1 mt-1">
-                          <div className="px-1.5 py-0.5 bg-primary/10 text-xs rounded text-primary">Selected</div>
-                          <a href={selectedComponents[category.id]?.url} target="_blank" rel="noopener noreferrer">
-                            <Button variant="ghost" size="sm" className="h-5 px-1.5 text-xs">
-                              <ExternalLink className="h-3 w-3" />
-                            </Button>
-                          </a>
-                        </div>
-                      </div>
-                    ) : crossSitePrices[category.id]?.["Skyland"] ? (
-                      <div className="flex flex-col space-y-1">
-                        <div className="font-medium text-sm text-right">
-                          {renderPrice(crossSitePrices[category.id]?.["Skyland"]?.price || "", "Skyland")}
-                        </div>
-                        <div className="flex items-center justify-end gap-1 mt-1">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="h-5 px-1.5 text-xs text-primary border-primary/30 hover:bg-primary/5 hover:text-primary hover:border-primary"
-                            onClick={() =>
-                              selectCrossSiteComponent(category.id, crossSitePrices[category.id]?.["Skyland"]!)
-                            }
-                          >
-                            <Check className="h-3 w-3 mr-0.5" />
-                            Select
-                          </Button>
-                          <a
-                            href={crossSitePrices[category.id]?.["Skyland"]?.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                          >
-                            <Button variant="ghost" size="sm" className="h-5 px-1.5 text-xs">
-                              <ExternalLink className="h-3 w-3" />
-                            </Button>
-                          </a>
-                        </div>
-                      </div>
-                    ) : (
-                      <span className="text-muted-foreground text-sm text-right block">N/A</span>
-                    )}
-                  </td>
-                </tr>
-              ))}
+                      </td>
+                      <td className="p-2 text-center">
+                        {loading ? (
+                          <Skeleton className="h-5 w-16 mx-auto" />
+                        ) : hasComponents ? (
+                          <div className="text-center font-medium text-sm">
+                            {renderPrice(
+                              selectedComponents[category.id][0]?.price || "",
+                              selectedComponents[category.id][0]?.source || "",
+                            )}
+                          </div>
+                        ) : (
+                          <div className="text-center">-</div>
+                        )}
+                      </td>
+                      <td className="p-2 text-center">
+                        {/* Startech column content */}
+                        {loading ? (
+                          <Skeleton className="h-5 w-16 mx-auto" />
+                        ) : hasComponents && selectedComponents[category.id][0]?.source === "Startech" ? (
+                          <div className="flex flex-col space-y-1 items-center">
+                            <div className="font-medium text-sm text-center">
+                              {renderPrice(selectedComponents[category.id][0]?.price || "", "Startech")}
+                            </div>
+                            <div className="flex items-center justify-center gap-1 mt-1">
+                              <div className="px-1.5 py-0.5 bg-primary/10 text-xs rounded text-primary">Selected</div>
+                              <a
+                                href={selectedComponents[category.id][0]?.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                              >
+                                <Button variant="ghost" size="sm" className="h-5 px-1.5 text-xs">
+                                  <ExternalLink className="h-3 w-3" />
+                                </Button>
+                              </a>
+                            </div>
+                          </div>
+                        ) : (selectedComponents[category.id]?.[0]?.id &&
+                            crossSitePrices[category.id]?.[selectedComponents[category.id][0]?.id]?.Startech) ||
+                          crossSitePrices[category.id]?.default?.Startech ? (
+                          <div className="flex flex-col space-y-1 items-center">
+                            <div className="font-medium text-sm text-center">
+                              {renderPrice(crossSitePrices[category.id]?.default?.Startech?.price || "", "Startech")}
+                            </div>
+                            <div className="flex items-center justify-center gap-1 mt-1">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-5 px-1.5 text-xs text-primary border-primary/30 hover:bg-primary/5 hover:text-primary hover:border-primary"
+                                onClick={() =>
+                                  selectCrossSiteComponent(
+                                    category.id,
+                                    crossSitePrices[category.id]?.default?.Startech!,
+                                  )
+                                }
+                              >
+                                <Check className="h-3 w-3 mr-0.5" />
+                                Select
+                              </Button>
+                              <a
+                                href={crossSitePrices[category.id]?.default?.Startech?.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                              >
+                                <Button variant="ghost" size="sm" className="h-5 px-1.5 text-xs">
+                                  <ExternalLink className="h-3 w-3" />
+                                </Button>
+                              </a>
+                            </div>
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground text-sm text-center block">N/A</span>
+                        )}
+                      </td>
+                      {/* Other retailer columns follow the same pattern */}
+                      <td className="p-2 text-center">
+                        {/* Techland column content - similar to Startech */}
+                        {loading ? (
+                          <Skeleton className="h-5 w-16 mx-auto" />
+                        ) : hasComponents && selectedComponents[category.id][0]?.source === "Techland" ? (
+                          <div className="flex flex-col space-y-1 items-center">
+                            <div className="font-medium text-sm text-center">
+                              {renderPrice(selectedComponents[category.id][0]?.price || "", "Techland")}
+                            </div>
+                            <div className="flex items-center justify-center gap-1 mt-1">
+                              <div className="px-1.5 py-0.5 bg-primary/10 text-xs rounded text-primary">Selected</div>
+                              <a
+                                href={selectedComponents[category.id][0]?.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                              >
+                                <Button variant="ghost" size="sm" className="h-5 px-1.5 text-xs">
+                                  <ExternalLink className="h-3 w-3" />
+                                </Button>
+                              </a>
+                            </div>
+                          </div>
+                        ) : (selectedComponents[category.id]?.[0]?.id &&
+                            crossSitePrices[category.id]?.[selectedComponents[category.id][0]?.id]?.Techland) ||
+                          crossSitePrices[category.id]?.default?.Techland ? (
+                          <div className="flex flex-col space-y-1 items-center">
+                            <div className="font-medium text-sm text-center">
+                              {renderPrice(crossSitePrices[category.id]?.default?.Techland?.price || "", "Techland")}
+                            </div>
+                            <div className="flex items-center justify-center gap-1 mt-1">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-5 px-1.5 text-xs text-primary border-primary/30 hover:bg-primary/5 hover:text-primary hover:border-primary"
+                                onClick={() =>
+                                  selectCrossSiteComponent(
+                                    category.id,
+                                    crossSitePrices[category.id]?.default?.Techland!,
+                                  )
+                                }
+                              >
+                                <Check className="h-3 w-3 mr-0.5" />
+                                Select
+                              </Button>
+                              <a
+                                href={crossSitePrices[category.id]?.default?.Techland?.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                              >
+                                <Button variant="ghost" size="sm" className="h-5 px-1.5 text-xs">
+                                  <ExternalLink className="h-3 w-3" />
+                                </Button>
+                              </a>
+                            </div>
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground text-sm text-center block">N/A</span>
+                        )}
+                      </td>
+                      <td className="p-2 text-center">
+                        {/* UltraTech column content - similar to Startech */}
+                        {loading ? (
+                          <Skeleton className="h-5 w-16 mx-auto" />
+                        ) : hasComponents && selectedComponents[category.id][0]?.source === "UltraTech" ? (
+                          <div className="flex flex-col space-y-1 items-center">
+                            <div className="font-medium text-sm text-center">
+                              {renderPrice(selectedComponents[category.id][0]?.price || "", "UltraTech")}
+                            </div>
+                            <div className="flex items-center justify-center gap-1 mt-1">
+                              <div className="px-1.5 py-0.5 bg-primary/10 text-xs rounded text-primary">Selected</div>
+                              <a
+                                href={selectedComponents[category.id][0]?.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                              >
+                                <Button variant="ghost" size="sm" className="h-5 px-1.5 text-xs">
+                                  <ExternalLink className="h-3 w-3" />
+                                </Button>
+                              </a>
+                            </div>
+                          </div>
+                        ) : (selectedComponents[category.id]?.[0]?.id &&
+                            crossSitePrices[category.id]?.[selectedComponents[category.id][0]?.id]?.UltraTech) ||
+                          crossSitePrices[category.id]?.default?.UltraTech ? (
+                          <div className="flex flex-col space-y-1 items-center">
+                            <div className="font-medium text-sm text-center">
+                              {renderPrice(crossSitePrices[category.id]?.default?.UltraTech?.price || "", "UltraTech")}
+                            </div>
+                            <div className="flex items-center justify-center gap-1 mt-1">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-5 px-1.5 text-xs text-primary border-primary/30 hover:bg-primary/5 hover:text-primary hover:border-primary"
+                                onClick={() =>
+                                  selectCrossSiteComponent(
+                                    category.id,
+                                    crossSitePrices[category.id]?.default?.UltraTech!,
+                                  )
+                                }
+                              >
+                                <Check className="h-3 w-3 mr-0.5" />
+                                Select
+                              </Button>
+                              <a
+                                href={crossSitePrices[category.id]?.default?.UltraTech?.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                              >
+                                <Button variant="ghost" size="sm" className="h-5 px-1.5 text-xs">
+                                  <ExternalLink className="h-3 w-3" />
+                                </Button>
+                              </a>
+                            </div>
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground text-sm text-center block">N/A</span>
+                        )}
+                      </td>
+                      <td className="p-2 text-center">
+                        {/* Potaka IT column content - similar to Startech */}
+                        {loading ? (
+                          <Skeleton className="h-5 w-16 mx-auto" />
+                        ) : hasComponents && selectedComponents[category.id][0]?.source === "Potaka IT" ? (
+                          <div className="flex flex-col space-y-1 items-center">
+                            <div className="font-medium text-sm text-center">
+                              {renderPrice(selectedComponents[category.id][0]?.price || "", "Potaka IT")}
+                            </div>
+                            <div className="flex items-center justify-center gap-1 mt-1">
+                              <div className="px-1.5 py-0.5 bg-primary/10 text-xs rounded text-primary">Selected</div>
+                              <a
+                                href={selectedComponents[category.id][0]?.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                              >
+                                <Button variant="ghost" size="sm" className="h-5 px-1.5 text-xs">
+                                  <ExternalLink className="h-3 w-3" />
+                                </Button>
+                              </a>
+                            </div>
+                          </div>
+                        ) : (selectedComponents[category.id]?.[0]?.id &&
+                            crossSitePrices[category.id]?.[selectedComponents[category.id][0]?.id]?.["Potaka IT"]) ||
+                          crossSitePrices[category.id]?.default?.["Potaka IT"] ? (
+                          <div className="flex flex-col space-y-1 items-center">
+                            <div className="font-medium text-sm text-center">
+                              {renderPrice(
+                                crossSitePrices[category.id]?.default?.["Potaka IT"]?.price || "",
+                                "Potaka IT",
+                              )}
+                            </div>
+                            <div className="flex items-center justify-center gap-1 mt-1">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-5 px-1.5 text-xs text-primary border-primary/30 hover:bg-primary/5 hover:text-primary hover:border-primary"
+                                onClick={() =>
+                                  selectCrossSiteComponent(
+                                    category.id,
+                                    crossSitePrices[category.id]?.default?.["Potaka IT"]!,
+                                  )
+                                }
+                              >
+                                <Check className="h-3 w-3 mr-0.5" />
+                                Select
+                              </Button>
+                              <a
+                                href={crossSitePrices[category.id]?.default?.["Potaka IT"]?.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                              >
+                                <Button variant="ghost" size="sm" className="h-5 px-1.5 text-xs">
+                                  <ExternalLink className="h-3 w-3" />
+                                </Button>
+                              </a>
+                            </div>
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground text-sm text-center block">N/A</span>
+                        )}
+                      </td>
+                      <td className="p-2 text-center">
+                        {/* PC House column content - similar to Startech */}
+                        {loading ? (
+                          <Skeleton className="h-5 w-16 mx-auto" />
+                        ) : hasComponents && selectedComponents[category.id][0]?.source === "PC House" ? (
+                          <div className="flex flex-col space-y-1 items-center">
+                            <div className="font-medium text-sm text-center">
+                              {renderPrice(selectedComponents[category.id][0]?.price || "", "PC House")}
+                            </div>
+                            <div className="flex items-center justify-center gap-1 mt-1">
+                              <div className="px-1.5 py-0.5 bg-primary/10 text-xs rounded text-primary">Selected</div>
+                              <a
+                                href={selectedComponents[category.id][0]?.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                              >
+                                <Button variant="ghost" size="sm" className="h-5 px-1.5 text-xs">
+                                  <ExternalLink className="h-3 w-3" />
+                                </Button>
+                              </a>
+                            </div>
+                          </div>
+                        ) : (selectedComponents[category.id]?.[0]?.id &&
+                            crossSitePrices[category.id]?.[selectedComponents[category.id][0]?.id]?.["PC House"]) ||
+                          crossSitePrices[category.id]?.default?.["PC House"] ? (
+                          <div className="flex flex-col space-y-1 items-center">
+                            <div className="font-medium text-sm text-center">
+                              {renderPrice(
+                                crossSitePrices[category.id]?.default?.["PC House"]?.price || "",
+                                "PC House",
+                              )}
+                            </div>
+                            <div className="flex items-center justify-center gap-1 mt-1">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-5 px-1.5 text-xs text-primary border-primary/30 hover:bg-primary/5 hover:text-primary hover:border-primary"
+                                onClick={() =>
+                                  selectCrossSiteComponent(
+                                    category.id,
+                                    crossSitePrices[category.id]?.default?.["PC House"]!,
+                                  )
+                                }
+                              >
+                                <Check className="h-3 w-3 mr-0.5" />
+                                Select
+                              </Button>
+                              <a
+                                href={crossSitePrices[category.id]?.default?.["PC House"]?.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                              >
+                                <Button variant="ghost" size="sm" className="h-5 px-1.5 text-xs">
+                                  <ExternalLink className="h-3 w-3" />
+                                </Button>
+                              </a>
+                            </div>
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground text-sm text-center block">N/A</span>
+                        )}
+                      </td>
+                      <td className="p-2 text-center">
+                        {/* Skyland column content - similar to Startech */}
+                        {loading ? (
+                          <Skeleton className="h-5 w-16 mx-auto" />
+                        ) : hasComponents && selectedComponents[category.id][0]?.source === "Skyland" ? (
+                          <div className="flex flex-col space-y-1 items-center">
+                            <div className="font-medium text-sm text-center">
+                              {renderPrice(selectedComponents[category.id][0]?.price || "", "Skyland")}
+                            </div>
+                            <div className="flex items-center justify-center gap-1 mt-1">
+                              <div className="px-1.5 py-0.5 bg-primary/10 text-xs rounded text-primary">Selected</div>
+                              <a
+                                href={selectedComponents[category.id][0]?.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                              >
+                                <Button variant="ghost" size="sm" className="h-5 px-1.5 text-xs">
+                                  <ExternalLink className="h-3 w-3" />
+                                </Button>
+                              </a>
+                            </div>
+                          </div>
+                        ) : (selectedComponents[category.id]?.[0]?.id &&
+                            crossSitePrices[category.id]?.[selectedComponents[category.id][0]?.id]?.["Skyland"]) ||
+                          crossSitePrices[category.id]?.default?.["Skyland"] ? (
+                          <div className="flex flex-col space-y-1 items-center">
+                            <div className="font-medium text-sm text-center">
+                              {renderPrice(crossSitePrices[category.id]?.default?.["Skyland"]?.price || "", "Skyland")}
+                            </div>
+                            <div className="flex items-center justify-center gap-1 mt-1">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-5 px-1.5 text-xs text-primary border-primary/30 hover:bg-primary/5 hover:text-primary hover:border-primary"
+                                onClick={() =>
+                                  selectCrossSiteComponent(
+                                    category.id,
+                                    crossSitePrices[category.id]?.default?.["Skyland"]!,
+                                  )
+                                }
+                              >
+                                <Check className="h-3 w-3 mr-0.5" />
+                                Select
+                              </Button>
+                              <a
+                                href={crossSitePrices[category.id]?.default?.["Skyland"]?.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                              >
+                                <Button variant="ghost" size="sm" className="h-5 px-1.5 text-xs">
+                                  <ExternalLink className="h-3 w-3" />
+                                </Button>
+                              </a>
+                            </div>
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground text-sm text-center block">N/A</span>
+                        )}
+                      </td>
+                    </tr>
+
+                    {/* Additional rows for multiple components */}
+                    {hasComponents &&
+                      selectedComponents[category.id].length > 1 &&
+                      selectedComponents[category.id].slice(1).map((component, index) => (
+                        <tr key={component.id || `${category.id}-${index + 1}`} className="border-b bg-muted/20">
+                          <td className="p-2 pl-6 text-xs text-muted-foreground">
+                            {category.label} #{index + 2}
+                          </td>
+                          <td className="p-2">
+                            <div className="flex items-start gap-2">
+                              <div className="w-10 h-10 bg-white rounded relative flex-shrink-0">
+                                {component.image ? (
+                                  <Image
+                                    src={component.image || ""}
+                                    alt={component.name || ""}
+                                    fill
+                                    className="object-contain p-1"
+                                  />
+                                ) : (
+                                  <div className="flex items-center justify-center h-full text-muted-foreground text-xs">
+                                    No image
+                                  </div>
+                                )}
+                              </div>
+                              <div className="flex-1">
+                                <ProductTooltip product={component}>
+                                  <div className="font-medium text-xs truncate max-w-[180px]">
+                                    {truncateName(component.name || "", 4)}
+                                  </div>
+                                </ProductTooltip>
+                                <div className="flex gap-1 mt-1">
+                                  <Link href={`/build/components/${category.id}`}>
+                                    <Button variant="link" className="p-0 h-auto text-[10px] text-muted-foreground">
+                                      Change
+                                    </Button>
+                                  </Link>
+                                  <Button
+                                    variant="link"
+                                    className="p-0 h-auto text-[10px] text-red-500"
+                                    onClick={() => removeComponent(category.id, component.id || "")}
+                                  >
+                                    Remove
+                                  </Button>
+                                  <Button
+                                    variant="link"
+                                    className="p-0 h-auto text-[10px] text-primary"
+                                    onClick={() => refreshCrossSitePrices(category.id, component)}
+                                    disabled={crossSiteLoading[component.id || ""]}
+                                  >
+                                    {crossSiteLoading[component.id || ""] ? (
+                                      <RefreshCw className="h-2 w-2 mr-0.5 animate-spin" />
+                                    ) : (
+                                      <RefreshCw className="h-2 w-2 mr-0.5" />
+                                    )}
+                                    Compare
+                                  </Button>
+                                </div>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="p-2 text-center">
+                            <div className="text-center font-medium text-sm">
+                              {renderPrice(component.price || "", component.source || "")}
+                            </div>
+                          </td>
+                          {/* Retailer columns for additional components */}
+                          <td className="p-2 text-center">
+                            {/* Startech column */}
+                            {component.source === "Startech" ? (
+                              <div className="flex flex-col space-y-1 items-center">
+                                <div className="font-medium text-sm text-center">
+                                  {renderPrice(component.price || "", "Startech")}
+                                </div>
+                                <div className="flex items-center justify-center gap-1 mt-1">
+                                  <div className="px-1.5 py-0.5 bg-primary/10 text-xs rounded text-primary">
+                                    Selected
+                                  </div>
+                                  <a href={component.url} target="_blank" rel="noopener noreferrer">
+                                    <Button variant="ghost" size="sm" className="h-5 px-1.5 text-xs">
+                                      <ExternalLink className="h-3 w-3" />
+                                    </Button>
+                                  </a>
+                                </div>
+                              </div>
+                            ) : (component.id && crossSitePrices[category.id]?.[component.id]?.Startech) ||
+                              crossSitePrices[category.id]?.[component.id || ""]?.Startech ? (
+                              <div className="flex flex-col space-y-1 items-center">
+                                <div className="font-medium text-sm text-center">
+                                  {renderPrice(
+                                    crossSitePrices[category.id]?.[component.id || ""]?.Startech?.price || "",
+                                    "Startech",
+                                  )}
+                                </div>
+                                <div className="flex items-center justify-center gap-1 mt-1">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="h-5 px-1.5 text-xs text-primary border-primary/30 hover:bg-primary/5 hover:text-primary hover:border-primary"
+                                    onClick={() =>
+                                      selectCrossSiteComponent(
+                                        category.id,
+                                        crossSitePrices[category.id]?.[component.id || ""]?.Startech!,
+                                        component.id,
+                                      )
+                                    }
+                                  >
+                                    <Check className="h-3 w-3 mr-0.5" />
+                                    Select
+                                  </Button>
+                                  <a
+                                    href={crossSitePrices[category.id]?.[component.id || ""]?.Startech?.url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                  >
+                                    <Button variant="ghost" size="sm" className="h-5 px-1.5 text-xs">
+                                      <ExternalLink className="h-3 w-3" />
+                                    </Button>
+                                  </a>
+                                </div>
+                              </div>
+                            ) : (
+                              <span className="text-muted-foreground text-sm text-center block">N/A</span>
+                            )}
+                          </td>
+                          <td className="p-2 text-center">
+                            {/* Techland column */}
+                            {component.source === "Techland" ? (
+                              <div className="flex flex-col space-y-1 items-center">
+                                <div className="font-medium text-sm text-center">
+                                  {renderPrice(component.price || "", "Techland")}
+                                </div>
+                                <div className="flex items-center justify-center gap-1 mt-1">
+                                  <div className="px-1.5 py-0.5 bg-primary/10 text-xs rounded text-primary">
+                                    Selected
+                                  </div>
+                                  <a href={component.url} target="_blank" rel="noopener noreferrer">
+                                    <Button variant="ghost" size="sm" className="h-5 px-1.5 text-xs">
+                                      <ExternalLink className="h-3 w-3" />
+                                    </Button>
+                                  </a>
+                                </div>
+                              </div>
+                            ) : (component.id && crossSitePrices[category.id]?.[component.id]?.Techland) ||
+                              crossSitePrices[category.id]?.[component.id || ""]?.Techland ? (
+                              <div className="flex flex-col space-y-1 items-center">
+                                <div className="font-medium text-sm text-center">
+                                  {renderPrice(
+                                    crossSitePrices[category.id]?.[component.id || ""]?.Techland?.price || "",
+                                    "Techland",
+                                  )}
+                                </div>
+                                <div className="flex items-center justify-center gap-1 mt-1">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="h-5 px-1.5 text-xs text-primary border-primary/30 hover:bg-primary/5 hover:text-primary hover:border-primary"
+                                    onClick={() =>
+                                      selectCrossSiteComponent(
+                                        category.id,
+                                        crossSitePrices[category.id]?.[component.id || ""]?.Techland!,
+                                        component.id,
+                                      )
+                                    }
+                                  >
+                                    <Check className="h-3 w-3 mr-0.5" />
+                                    Select
+                                  </Button>
+                                  <a
+                                    href={crossSitePrices[category.id]?.[component.id || ""]?.Techland?.url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                  >
+                                    <Button variant="ghost" size="sm" className="h-5 px-1.5 text-xs">
+                                      <ExternalLink className="h-3 w-3" />
+                                    </Button>
+                                  </a>
+                                </div>
+                              </div>
+                            ) : (
+                              <span className="text-muted-foreground text-sm text-center block">N/A</span>
+                            )}
+                          </td>
+                          <td className="p-2 text-center">
+                            {/* UltraTech column */}
+                            {component.source === "UltraTech" ? (
+                              <div className="flex flex-col space-y-1 items-center">
+                                <div className="font-medium text-sm text-center">
+                                  {renderPrice(component.price || "", "UltraTech")}
+                                </div>
+                                <div className="flex items-center justify-center gap-1 mt-1">
+                                  <div className="px-1.5 py-0.5 bg-primary/10 text-xs rounded text-primary">
+                                    Selected
+                                  </div>
+                                  <a href={component.url} target="_blank" rel="noopener noreferrer">
+                                    <Button variant="ghost" size="sm" className="h-5 px-1.5 text-xs">
+                                      <ExternalLink className="h-3 w-3" />
+                                    </Button>
+                                  </a>
+                                </div>
+                              </div>
+                            ) : (component.id && crossSitePrices[category.id]?.[component.id]?.UltraTech) ||
+                              crossSitePrices[category.id]?.[component.id || ""]?.UltraTech ? (
+                              <div className="flex flex-col space-y-1 items-center">
+                                <div className="font-medium text-sm text-center">
+                                  {renderPrice(
+                                    crossSitePrices[category.id]?.[component.id || ""]?.UltraTech?.price || "",
+                                    "UltraTech",
+                                  )}
+                                </div>
+                                <div className="flex items-center justify-center gap-1 mt-1">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="h-5 px-1.5 text-xs text-primary border-primary/30 hover:bg-primary/5 hover:text-primary hover:border-primary"
+                                    onClick={() =>
+                                      selectCrossSiteComponent(
+                                        category.id,
+                                        crossSitePrices[category.id]?.[component.id || ""]?.UltraTech!,
+                                        component.id,
+                                      )
+                                    }
+                                  >
+                                    <Check className="h-3 w-3 mr-0.5" />
+                                    Select
+                                  </Button>
+                                  <a
+                                    href={crossSitePrices[category.id]?.[component.id || ""]?.UltraTech?.url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                  >
+                                    <Button variant="ghost" size="sm" className="h-5 px-1.5 text-xs">
+                                      <ExternalLink className="h-3 w-3" />
+                                    </Button>
+                                  </a>
+                                </div>
+                              </div>
+                            ) : (
+                              <span className="text-muted-foreground text-sm text-center block">N/A</span>
+                            )}
+                          </td>
+                          <td className="p-2 text-center">
+                            {/* Potaka IT column */}
+                            {component.source === "Potaka IT" ? (
+                              <div className="flex flex-col space-y-1 items-center">
+                                <div className="font-medium text-sm text-center">
+                                  {renderPrice(component.price || "", "Potaka IT")}
+                                </div>
+                                <div className="flex items-center justify-center gap-1 mt-1">
+                                  <div className="px-1.5 py-0.5 bg-primary/10 text-xs rounded text-primary">
+                                    Selected
+                                  </div>
+                                  <a href={component.url} target="_blank" rel="noopener noreferrer">
+                                    <Button variant="ghost" size="sm" className="h-5 px-1.5 text-xs">
+                                      <ExternalLink className="h-3 w-3" />
+                                    </Button>
+                                  </a>
+                                </div>
+                              </div>
+                            ) : (component.id && crossSitePrices[category.id]?.[component.id]?.["Potaka IT"]) ||
+                              crossSitePrices[category.id]?.[component.id || ""]?.["Potaka IT"] ? (
+                              <div className="flex flex-col space-y-1 items-center">
+                                <div className="font-medium text-sm text-center">
+                                  {renderPrice(
+                                    crossSitePrices[category.id]?.[component.id || ""]?.["Potaka IT"]?.price || "",
+                                    "Potaka IT",
+                                  )}
+                                </div>
+                                <div className="flex items-center justify-center gap-1 mt-1">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="h-5 px-1.5 text-xs text-primary border-primary/30 hover:bg-primary/5 hover:text-primary hover:border-primary"
+                                    onClick={() =>
+                                      selectCrossSiteComponent(
+                                        category.id,
+                                        crossSitePrices[category.id]?.[component.id || ""]?.["Potaka IT"]!,
+                                        component.id,
+                                      )
+                                    }
+                                  >
+                                    <Check className="h-3 w-3 mr-0.5" />
+                                    Select
+                                  </Button>
+                                  <a
+                                    href={crossSitePrices[category.id]?.[component.id || ""]?.["Potaka IT"]?.url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                  >
+                                    <Button variant="ghost" size="sm" className="h-5 px-1.5 text-xs">
+                                      <ExternalLink className="h-3 w-3" />
+                                    </Button>
+                                  </a>
+                                </div>
+                              </div>
+                            ) : (
+                              <span className="text-muted-foreground text-sm text-center block">N/A</span>
+                            )}
+                          </td>
+                          <td className="p-2 text-center">
+                            {/* PC House column */}
+                            {component.source === "PC House" ? (
+                              <div className="flex flex-col space-y-1 items-center">
+                                <div className="font-medium text-sm text-center">
+                                  {renderPrice(component.price || "", "PC House")}
+                                </div>
+                                <div className="flex items-center justify-center gap-1 mt-1">
+                                  <div className="px-1.5 py-0.5 bg-primary/10 text-xs rounded text-primary">
+                                    Selected
+                                  </div>
+                                  <a href={component.url} target="_blank" rel="noopener noreferrer">
+                                    <Button variant="ghost" size="sm" className="h-5 px-1.5 text-xs">
+                                      <ExternalLink className="h-3 w-3" />
+                                    </Button>
+                                  </a>
+                                </div>
+                              </div>
+                            ) : (component.id && crossSitePrices[category.id]?.[component.id]?.["PC House"]) ||
+                              crossSitePrices[category.id]?.[component.id || ""]?.["PC House"] ? (
+                              <div className="flex flex-col space-y-1 items-center">
+                                <div className="font-medium text-sm text-center">
+                                  {renderPrice(
+                                    crossSitePrices[category.id]?.[component.id || ""]?.["PC House"]?.price || "",
+                                    "PC House",
+                                  )}
+                                </div>
+                                <div className="flex items-center justify-center gap-1 mt-1">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="h-5 px-1.5 text-xs text-primary border-primary/30 hover:bg-primary/5 hover:text-primary hover:border-primary"
+                                    onClick={() =>
+                                      selectCrossSiteComponent(
+                                        category.id,
+                                        crossSitePrices[category.id]?.[component.id || ""]?.["PC House"]!,
+                                        component.id,
+                                      )
+                                    }
+                                  >
+                                    <Check className="h-3 w-3 mr-0.5" />
+                                    Select
+                                  </Button>
+                                  <a
+                                    href={crossSitePrices[category.id]?.[component.id || ""]?.["PC House"]?.url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                  >
+                                    <Button variant="ghost" size="sm" className="h-5 px-1.5 text-xs">
+                                      <ExternalLink className="h-3 w-3" />
+                                    </Button>
+                                  </a>
+                                </div>
+                              </div>
+                            ) : (
+                              <span className="text-muted-foreground text-sm text-center block">N/A</span>
+                            )}
+                          </td>
+                          <td className="p-2 text-center">
+                            {/* Skyland column */}
+                            {component.source === "Skyland" ? (
+                              <div className="flex flex-col space-y-1 items-center">
+                                <div className="font-medium text-sm text-center">
+                                  {renderPrice(component.price || "", "Skyland")}
+                                </div>
+                                <div className="flex items-center justify-center gap-1 mt-1">
+                                  <div className="px-1.5 py-0.5 bg-primary/10 text-xs rounded text-primary">
+                                    Selected
+                                  </div>
+                                  <a href={component.url} target="_blank" rel="noopener noreferrer">
+                                    <Button variant="ghost" size="sm" className="h-5 px-1.5 text-xs">
+                                      <ExternalLink className="h-3 w-3" />
+                                    </Button>
+                                  </a>
+                                </div>
+                              </div>
+                            ) : (component.id && crossSitePrices[category.id]?.[component.id]?.["Skyland"]) ||
+                              crossSitePrices[category.id]?.[component.id || ""]?.["Skyland"] ? (
+                              <div className="flex flex-col space-y-1 items-center">
+                                <div className="font-medium text-sm text-center">
+                                  {renderPrice(
+                                    crossSitePrices[category.id]?.[component.id || ""]?.["Skyland"]?.price || "",
+                                    "Skyland",
+                                  )}
+                                </div>
+                                <div className="flex items-center justify-center gap-1 mt-1">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="h-5 px-1.5 text-xs text-primary border-primary/30 hover:bg-primary/5 hover:text-primary hover:border-primary"
+                                    onClick={() =>
+                                      selectCrossSiteComponent(
+                                        category.id,
+                                        crossSitePrices[category.id]?.[component.id || ""]?.["Skyland"]!,
+                                        component.id,
+                                      )
+                                    }
+                                  >
+                                    <Check className="h-3 w-3 mr-0.5" />
+                                    Select
+                                  </Button>
+                                  <a
+                                    href={crossSitePrices[category.id]?.[component.id || ""]?.["Skyland"]?.url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                  >
+                                    <Button variant="ghost" size="sm" className="h-5 px-1.5 text-xs">
+                                      <ExternalLink className="h-3 w-3" />
+                                    </Button>
+                                  </a>
+                                </div>
+                              </div>
+                            ) : (
+                              <span className="text-muted-foreground text-sm text-center block">N/A</span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                  </React.Fragment>
+                )
+              })}
             </tbody>
             <tfoot>
               <tr className="bg-muted border-t-2 border-border">
                 <td colSpan={2} className="p-2 text-right font-bold text-sm">
                   Total:
                 </td>
-                <td className="p-2">
+                <td className="p-2 text-center">
                   {loading ? (
-                    <Skeleton className="h-6 w-20 ml-auto" />
+                    <Skeleton className="h-6 w-20 mx-auto" />
                   ) : totalBase > 0 ? (
-                    <div className="font-bold text-base text-primary text-right">৳ {totalBase.toLocaleString()}</div>
+                    <div className="font-bold text-base text-primary text-center">৳ {totalBase.toLocaleString()}</div>
                   ) : (
-                    <span className="text-muted-foreground text-right block">N/A</span>
+                    <span className="text-muted-foreground text-center block">N/A</span>
                   )}
                 </td>
-                <td className="p-2">
+                <td className="p-2 text-center">
                   {loading ? (
-                    <Skeleton className="h-6 w-20 ml-auto" />
+                    <Skeleton className="h-6 w-20 mx-auto" />
                   ) : totalStartech > 0 ? (
-                    <div className="font-bold text-base text-primary text-right">
+                    <div className="font-bold text-base text-primary text-center">
                       ৳ {totalStartech.toLocaleString()}
                     </div>
                   ) : (
-                    <span className="text-muted-foreground text-right block">N/A</span>
+                    <span className="text-muted-foreground text-center block">N/A</span>
                   )}
                 </td>
-                <td className="p-2">
+                <td className="p-2 text-center">
                   {loading ? (
-                    <Skeleton className="h-6 w-20 ml-auto" />
+                    <Skeleton className="h-6 w-20 mx-auto" />
                   ) : totalTechland > 0 ? (
-                    <div className="font-bold text-base text-primary text-right">
+                    <div className="font-bold text-base text-primary text-center">
                       ৳ {totalTechland.toLocaleString()}
                     </div>
                   ) : (
-                    <span className="text-muted-foreground text-right block">N/A</span>
+                    <span className="text-muted-foreground text-center block">N/A</span>
                   )}
                 </td>
-                <td className="p-2">
+                <td className="p-2 text-center">
                   {loading ? (
-                    <Skeleton className="h-6 w-20 ml-auto" />
+                    <Skeleton className="h-6 w-20 mx-auto" />
                   ) : totalUltraTech > 0 ? (
-                    <div className="font-bold text-base text-primary text-right">
+                    <div className="font-bold text-base text-primary text-center">
                       ৳ {totalUltraTech.toLocaleString()}
                     </div>
                   ) : (
-                    <span className="text-muted-foreground text-right block">N/A</span>
+                    <span className="text-muted-foreground text-center block">N/A</span>
                   )}
                 </td>
-                <td className="p-2">
+                <td className="p-2 text-center">
                   {loading ? (
-                    <Skeleton className="h-6 w-20 ml-auto" />
+                    <Skeleton className="h-6 w-20 mx-auto" />
                   ) : totalPotakaIT > 0 ? (
-                    <div className="font-bold text-base text-primary text-right">
+                    <div className="font-bold text-base text-primary text-center">
                       ৳ {totalPotakaIT.toLocaleString()}
                     </div>
                   ) : (
-                    <span className="text-muted-foreground text-right block">N/A</span>
+                    <span className="text-muted-foreground text-center block">N/A</span>
                   )}
                 </td>
-                <td className="p-2">
+                <td className="p-2 text-center">
                   {loading ? (
-                    <Skeleton className="h-6 w-20 ml-auto" />
+                    <Skeleton className="h-6 w-20 mx-auto" />
                   ) : totalPCHouse > 0 ? (
-                    <div className="font-bold text-base text-primary text-right">৳ {totalPCHouse.toLocaleString()}</div>
+                    <div className="font-bold text-base text-primary text-center">
+                      ৳ {totalPCHouse.toLocaleString()}
+                    </div>
                   ) : (
-                    <span className="text-muted-foreground text-right block">N/A</span>
+                    <span className="text-muted-foreground text-center block">N/A</span>
                   )}
                 </td>
-                <td className="p-2">
+                <td className="p-2 text-center">
                   {loading ? (
-                    <Skeleton className="h-6 w-20 ml-auto" />
+                    <Skeleton className="h-6 w-20 mx-auto" />
                   ) : totalSkyland > 0 ? (
-                    <div className="font-bold text-base text-primary text-right">৳ {totalSkyland.toLocaleString()}</div>
+                    <div className="font-bold text-base text-primary text-center">
+                      ৳ {totalSkyland.toLocaleString()}
+                    </div>
                   ) : (
-                    <span className="text-muted-foreground text-right block">N/A</span>
+                    <span className="text-muted-foreground text-center block">N/A</span>
                   )}
                 </td>
               </tr>

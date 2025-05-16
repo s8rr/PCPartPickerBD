@@ -49,7 +49,7 @@ export const metadata: Metadata = {
   },
   icons: [{ url: "https://cdn-up.pages.dev/pc/pcppbd.svg" }],
   verification: {
-    google: "google-site-verification-code", // Replace with your actual verification code
+    google: "google-site-verification=YOUR_VERIFICATION_CODE", // Replace with your actual verification code
   },
   category: "technology",
     generator: 'v0.dev'
@@ -63,8 +63,9 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        <link rel="icon" href="https://cdn-up.pages.dev/pc/pcppbd.svg" />
+        <link rel="icon" href="https://cdn.pcpartpickerbd.com/pc/pcppbd.svg" />
         <link rel="canonical" href="https://pcpartpickerbd.com/" />
+        <meta name="google-site-verification" content="YOUR_VERIFICATION_CODE" />
         <StructuredData />
         <BreadcrumbJsonLd />
       </head>

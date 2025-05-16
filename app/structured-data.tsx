@@ -11,7 +11,10 @@ export default function StructuredData() {
             url: "https://pcpartpickerbd.com/",
             potentialAction: {
               "@type": "SearchAction",
-              target: "https://pcpartpickerbd.com/search?query={search_term_string}",
+              target: {
+                "@type": "EntryPoint",
+                urlTemplate: "https://pcpartpickerbd.com/search?query={search_term_string}",
+              },
               "query-input": "required name=search_term_string",
             },
             description:
@@ -25,7 +28,7 @@ export default function StructuredData() {
               },
             },
             sameAs: [
-              "https://facebook.com/pcpartpickerbd", // Replace with actual social media URLs
+              "https://facebook.com/pcpartpickerbd",
               "https://twitter.com/pcpartpickerbd",
               "https://instagram.com/pcpartpickerbd",
             ],
@@ -70,25 +73,96 @@ export default function StructuredData() {
                 position: 1,
                 name: "PC Builder",
                 url: "https://pcpartpickerbd.com/build",
+                description: "Build your custom PC with components from Bangladesh retailers",
               },
               {
                 "@type": "ListItem",
                 position: 2,
                 name: "Compare Products",
                 url: "https://pcpartpickerbd.com/compare",
+                description: "Compare PC components side by side to find the best deals",
               },
               {
                 "@type": "ListItem",
                 position: 3,
                 name: "PC Building Guides",
                 url: "https://pcpartpickerbd.com/guides",
+                description: "Learn how to build a PC with our step-by-step guides",
               },
               {
                 "@type": "ListItem",
                 position: 4,
                 name: "Search PC Parts",
                 url: "https://pcpartpickerbd.com/search",
+                description: "Search for PC components across all major Bangladesh retailers",
               },
+              {
+                "@type": "ListItem",
+                position: 5,
+                name: "CPUs",
+                url: "https://pcpartpickerbd.com/build/components/cpu",
+                description: "Find the best prices on CPUs in Bangladesh",
+              },
+              {
+                "@type": "ListItem",
+                position: 6,
+                name: "Graphics Cards",
+                url: "https://pcpartpickerbd.com/build/components/video-card",
+                description: "Compare graphics card prices from all major Bangladesh retailers",
+              },
+              {
+                "@type": "ListItem",
+                position: 7,
+                name: "Motherboards",
+                url: "https://pcpartpickerbd.com/build/components/motherboard",
+                description: "Find motherboards compatible with your CPU at the best prices",
+              },
+              {
+                "@type": "ListItem",
+                position: 8,
+                name: "Storage",
+                url: "https://pcpartpickerbd.com/build/components/storage",
+                description: "Compare prices on SSDs and HDDs in Bangladesh",
+              },
+            ],
+          }),
+        }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "SiteNavigationElement",
+            name: [
+              "Home",
+              "PC Builder",
+              "Compare Products",
+              "PC Building Guides",
+              "Search PC Parts",
+              "CPUs",
+              "Graphics Cards",
+              "Motherboards",
+              "RAM",
+              "Storage",
+              "Cases",
+              "Power Supplies",
+              "Monitors",
+            ],
+            url: [
+              "https://pcpartpickerbd.com/",
+              "https://pcpartpickerbd.com/build",
+              "https://pcpartpickerbd.com/compare",
+              "https://pcpartpickerbd.com/guides",
+              "https://pcpartpickerbd.com/search",
+              "https://pcpartpickerbd.com/build/components/cpu",
+              "https://pcpartpickerbd.com/build/components/video-card",
+              "https://pcpartpickerbd.com/build/components/motherboard",
+              "https://pcpartpickerbd.com/build/components/memory",
+              "https://pcpartpickerbd.com/build/components/storage",
+              "https://pcpartpickerbd.com/build/components/case",
+              "https://pcpartpickerbd.com/build/components/power-supply",
+              "https://pcpartpickerbd.com/build/components/monitor",
             ],
           }),
         }}

@@ -2,12 +2,14 @@
 User-agent: *
 Allow: /
 
-# Sitemap location
-Sitemap: https://pcpartpickerbd.com/sitemap.xml
-
 # Important pages for crawlers
 Allow: /build
 Allow: /compare
 Allow: /guides
 Allow: /search
 Allow: /build/components/
+Allow: /suggestions
+Allow: /bug-report
+
+# Sitemap location
+Sitemap: https://pcpartpickerbd.com/sitemap.xml

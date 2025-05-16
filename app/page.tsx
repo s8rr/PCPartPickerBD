@@ -28,7 +28,6 @@ import {
   Box,
 } from "lucide-react"
 import { SiteHeader } from "@/components/site-header"
-import { AttentionBanner } from "@/components/attention-banner"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Breadcrumbs } from "@/components/breadcrumbs"
 
@@ -259,7 +258,6 @@ export default function Home() {
 
   return (
     <main className="min-h-screen">
-      <AttentionBanner />
       <SiteHeader />
       <Breadcrumbs />
 

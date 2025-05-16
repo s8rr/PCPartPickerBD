@@ -21,7 +21,7 @@ export function BreadcrumbJsonLd() {
 
     return {
       "@type": "ListItem",
-      position: index + 1,
+      position: index + 2, // +2 because home is position 1
       name: name,
       item: `https://pcpartpickerbd.com${url}`,
     }
@@ -33,11 +33,6 @@ export function BreadcrumbJsonLd() {
     position: 1,
     name: "Home",
     item: "https://pcpartpickerbd.com",
-  })
-
-  // Adjust positions after adding home
-  breadcrumbItems.forEach((item, index) => {
-    item.position = index + 1
   })
 
   const breadcrumbData = {

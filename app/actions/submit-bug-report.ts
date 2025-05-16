@@ -1,5 +1,7 @@
 "use server"
 
+import { sendBugReportThankYouEmail } from "@/lib/email"
+
 interface BugReportData {
   name: string
   email: string
@@ -71,8 +73,14 @@ export async function submitBugReport(data: BugReportData): Promise<SubmitResult
     }
 
     // Send to Discord webhook
-    const webhookUrl =
-      "https://discord.com/api/webhooks/1364642852549955725/w2r3mCURVPmuU7s6rNByOKA0ndlGMIJ0WL2eYFoOMupIn1oPzasF0MvVaV_G7d0Xrq12"
+    const webhookUrl = process.env.DISCORD_BUG_REPORT_WEBHOOK_URL
+
+    // Add validation for the environment variable
+    if (!webhookUrl) {
+      console.error("Missing DISCORD_BUG_REPORT_WEBHOOK_URL environment variable")
+      return { success: false, error: "Server configuration error" }
+    }
+
     const response = await fetch(webhookUrl, {
       method: "POST",
       headers: {
@@ -85,6 +93,17 @@ export async function submitBugReport(data: BugReportData): Promise<SubmitResult
       const errorText = await response.text()
       console.error("Discord webhook error:", errorText)
       return { success: false, error: "Failed to send bug report to our team" }
+    }
+
+    // Send thank you email (non-blocking, won't affect success response)
+    try {
+      // We don't await this to ensure the function continues even if email fails
+      sendBugReportThankYouEmail(data.name, data.email).catch((error) => {
+        console.error("Error sending thank you email:", error)
+      })
+    } catch (emailError) {
+      // Log error but don't fail the submission
+      console.error("Failed to send thank you email:", emailError)
     }
 
     return { success: true }

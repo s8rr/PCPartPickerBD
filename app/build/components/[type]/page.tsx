@@ -8,8 +8,6 @@ import { Skeleton } from "@/components/ui/skeleton"
 import Image from "next/image"
 import { Filter, Check, Search, Loader2, RefreshCw, ArrowLeft } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
-import { SiteHeader } from "@/components/site-header"
-import { AttentionBanner } from "@/components/attention-banner"
 // Add the import for the Select component
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
@@ -21,6 +19,8 @@ interface Component {
   source: string
   url: string
   specs?: Record<string, string>
+  id?: string // Add optional id property
+  type?: string
 }
 
 // Map component types to display names
@@ -384,19 +384,92 @@ export default function ComponentSelectionPage() {
     fetchComponents(searchQuery)
   }
 
+  // Find the handleSelectComponent function and modify it to fetch cross-site prices immediately after selection
+
+  // Replace the existing handleSelectComponent function with this updated version:
   const handleSelectComponent = (component: Component) => {
     // Get current build from localStorage
     const currentBuildStr = localStorage.getItem("pcBuild")
     const currentBuild = currentBuildStr ? JSON.parse(currentBuildStr) : {}
 
+    // Check if this is a multi-component type (RAM, storage, monitor)
+    const isMultiComponent = ["memory", "storage", "monitor"].includes(type)
+
+    // Generate a unique ID for the component
+    const componentWithId = {
+      ...component,
+      id: Math.random().toString(36).substring(2, 9),
+      type: type, // Ensure the type is set
+    }
+
     // Update the build with the selected component
-    currentBuild[type] = component
+    if (isMultiComponent && currentBuild[type] && Array.isArray(currentBuild[type])) {
+      // Add to existing array of components
+      currentBuild[type].push(componentWithId)
+    } else if (isMultiComponent) {
+      // Create a new array with this component
+      currentBuild[type] = [componentWithId]
+    } else {
+      // For single component types, just replace any existing component
+      currentBuild[type] = [componentWithId]
+    }
 
     // Save updated build to localStorage
     localStorage.setItem("pcBuild", JSON.stringify(currentBuild))
 
+    // Pre-fetch cross-site prices for this component before navigating
+    fetchCrossSitePricesForComponent(componentWithId)
+
     // Navigate back to build page
     router.push("/build")
+  }
+
+  // Add this new function to fetch cross-site prices for a component
+  const fetchCrossSitePricesForComponent = async (component: Component) => {
+    try {
+      console.log(`Pre-fetching cross-site prices for ${component.name}`)
+
+      // Get existing cross-site prices from localStorage
+      const savedCrossSitePrices = localStorage.getItem("pcBuildCrossSitePrices")
+      const crossSitePrices = savedCrossSitePrices ? JSON.parse(savedCrossSitePrices) : {}
+
+      // Add timeout to prevent hanging requests
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 30000) // 30 second timeout
+
+      const response = await fetch(
+        `/api/cross-site-search?query=${encodeURIComponent(component.name)}&excludeSource=${encodeURIComponent(component.source)}`,
+        { signal: controller.signal },
+      ).catch((error) => {
+        console.error(`Error pre-fetching cross-site prices: ${error.message}`)
+        return null
+      })
+
+      clearTimeout(timeoutId)
+
+      if (!response || !response.ok) {
+        throw new Error(`Failed to fetch cross-site prices: ${response?.status || "No response"}`)
+      }
+
+      const data = await response.json()
+      console.log(`Received pre-fetched cross-site prices for ${component.name}:`, data)
+
+      // Update cross-site prices in localStorage
+      const componentType = component.type || type
+      const componentId = component.id || "default"
+
+      if (!crossSitePrices[componentType]) {
+        crossSitePrices[componentType] = {}
+      }
+
+      crossSitePrices[componentType][componentId] = data.crossSiteProducts
+
+      // Save updated cross-site prices to localStorage
+      localStorage.setItem("pcBuildCrossSitePrices", JSON.stringify(crossSitePrices))
+      console.log(`Updated localStorage with pre-fetched prices for ${component.name}`)
+    } catch (error) {
+      console.error("Error pre-fetching cross-site prices:", error)
+    }
   }
 
   // Component skeleton for loading state
@@ -426,8 +499,6 @@ export default function ComponentSelectionPage() {
 
   return (
     <div className="min-h-screen">
-      <AttentionBanner />
-      <SiteHeader />
       <div className="container mx-auto py-8 px-4">
         <div className="mb-6">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4">
